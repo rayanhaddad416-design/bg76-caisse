@@ -1,0 +1,17 @@
+{
+  "name": "Burger Grill 76 — Prise de commande",
+  "short_name": "BG76 Caisse",
+  "description": "Logiciel de prise de commande du restaurant Burger Grill 76",
+  "lang": "fr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f5f7",
+  "theme_color": "#0637c8",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
