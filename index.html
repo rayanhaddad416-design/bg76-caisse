@@ -685,7 +685,10 @@ function loadSettings(){
   try { return Object.assign({}, SETTINGS_DEFAULT, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
   catch (e) { return Object.assign({}, SETTINGS_DEFAULT); }
 }
-function saveSettings(){ try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+function saveSettings(){
+  if (cloudOn && db) db.collection('app').doc('settings').set(settings).catch(() => {});
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+}
 
 // ===================== TICKET / IMPRESSION =====================
 function buildReceiptHTML(snap){
@@ -1536,12 +1539,15 @@ document.getElementById('nav-recap').addEventListener('click', () => { openRecap
 document.getElementById('nav-settings').addEventListener('click', () => { openSettings(); closeMenu(); });
 
 // ===================== ECRAN PARAMETRES =====================
-function openSettings(){
+function fillSettingsFields(){
   document.getElementById('set-autoprint').checked = !!settings.autoPrint;
   document.getElementById('set-name').value = settings.shopName || '';
   document.getElementById('set-addr').value = settings.shopAddr || '';
   document.getElementById('set-phone').value = settings.shopPhone || '';
   document.getElementById('set-prep').value = settings.prepMinutes != null ? settings.prepMinutes : 15;
+}
+function openSettings(){
+  fillSettingsFields();
   updateInstallHint();
   showScreen('screen-settings');
 }
@@ -1752,6 +1758,17 @@ function initCloud(){
       outOfStock = new Set(data.list);
       try { localStorage.setItem(STOCK_KEY, JSON.stringify([...outOfStock])); } catch (e) {}
       buildProductList();
+    }, () => {});
+
+    // Paramètres en temps réel (nom, tel, adresse, impression auto, temps de prépa)
+    db.collection('app').doc('settings').onSnapshot(doc => {
+      const data = doc.data();
+      if (!data) return;
+      settings = Object.assign({}, SETTINGS_DEFAULT, data);
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+      const active = document.querySelector('.screen:not(.hidden)');
+      const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest('.settings-form');
+      if (active && active.id === 'screen-settings' && !editing) fillSettingsFields();
     }, () => {});
 
     // Historique en temps réel : chaque commande finie apparaît sur tous les appareils
