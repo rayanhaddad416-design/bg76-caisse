@@ -240,6 +240,20 @@
   .recap-total.grand { font-size: 22px; }
   .recap-total.grand span:last-child { color: #0637c8; }
 
+  /* Ticket détaillé (écran merci, historique, impression) */
+  .rc-art { padding: 8px 0; }
+  .rc-art + .rc-art { border-top: 1px solid #e2e2e2; }
+  .rc-art-head { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; font-size: 15px; }
+  .rc-sec { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #555; margin: 7px 0 2px; }
+  .rc-opt { display: flex; justify-content: space-between; gap: 10px; padding-left: 16px; font-size: 14px; color: #222; }
+  .rc-opt .rc-price { color: #666; white-space: nowrap; }
+  .rc-sep { border-top: 2px dashed #999; margin: 12px 0; }
+  .rc-tot { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; padding: 3px 0; }
+  .rc-tot.grand { font-size: 20px; font-weight: 800; border-top: 2px solid #000; margin-top: 8px; padding-top: 8px; }
+  .rc-tot.grand span:last-child { color: #0637c8; }
+  .rc-meta { color: #555; font-size: 13.5px; margin-top: 10px; line-height: 1.6; }
+  .rc-foot { text-align: center; font-weight: 700; margin-top: 14px; }
+
   /* Toast de confirmation */
   .toast {
     position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
@@ -474,6 +488,9 @@
         <label>Téléphone (sur le ticket)
           <input type="text" id="set-phone" placeholder="02 xx xx xx xx">
         </label>
+        <label>Temps de préparation (minutes)
+          <input type="number" id="set-prep" min="0" step="1" placeholder="15">
+        </label>
         <button type="button" class="btn btn-outline" id="set-test-print">🖨️ Imprimer un ticket de test</button>
 
         <div class="install-box">
@@ -510,7 +527,7 @@ const EXTRA_PRICES = {
 
 // flow : pain / cuisson / sauce / crudites / extras (booléens) ; viandes = nombre de viandes à choisir
 const MENU = [
-  { title: "Nos Sandwichs", items: [
+  { title: "Nos Sandwichs", type: "Sandwich", items: [
     { id:"kebab-maison", name:"Kebab Maison", desc:"Viande kebab maison", price:7.50, flow:{pain:true,sauce:true,crudites:true,extras:true} },
     { id:"chicken",  name:"Chicken",  desc:"Poulet", price:7.50, flow:{pain:true,sauce:true,crudites:true,extras:true} },
     { id:"boursin-s",name:"Boursin",  desc:"Poulet, boursin", price:8.00, flow:{pain:true,sauce:true,crudites:true,extras:true} },
@@ -522,7 +539,7 @@ const MENU = [
     { id:"majestic", name:"Majestic", desc:"Steak haché 100g, galette de PDT, cheddar", price:8.50, flow:{pain:true,sauce:true,crudites:true,extras:true} },
     { id:"royal",    name:"Royal",    desc:"2 viandes au choix, cheddar", price:9.00, flow:{viandes:2,pain:true,sauce:true,crudites:true,extras:true} },
   ]},
-  { title: "Nos Burgers Maison", items: [
+  { title: "Nos Burgers Maison", type: "Burger", items: [
     { id:"b-cheddar",  name:"Cheddar",     desc:"Steak haché, pain brioché, cheddar", sizes:[{label:"100g",price:7.50},{label:"150g",price:8.50}], flow:{cuisson:true,sauce:true,crudites:true,extras:true} },
     { id:"b-eggs",     name:"Eggs",        desc:"Steak haché, pain brioché, œuf, cheddar", sizes:[{label:"100g",price:8.00},{label:"150g",price:9.00}], flow:{cuisson:true,sauce:true,crudites:true,extras:true} },
     { id:"b-boursin",  name:"Boursin",     desc:"Steak haché, pain brioché, boursin, cheddar", sizes:[{label:"100g",price:7.50},{label:"150g",price:8.50}], flow:{cuisson:true,sauce:true,crudites:true,extras:true} },
@@ -619,7 +636,7 @@ function escapeHtml(s){
 
 // ===================== PARAMETRES (persistant) =====================
 const SETTINGS_KEY = 'bg76_settings';
-const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '' };
+const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15 };
 let settings = loadSettings();
 let lastSnap = null;   // dernière commande finie (pour réimprimer)
 
@@ -635,31 +652,16 @@ function buildReceiptHTML(snap){
   h += '<div class="r-center r-big">' + escapeHtml(settings.shopName || 'Restaurant') + '</div>';
   if (settings.shopAddr)  h += '<div class="r-center">' + escapeHtml(settings.shopAddr) + '</div>';
   if (settings.shopPhone) h += '<div class="r-center">' + escapeHtml(settings.shopPhone) + '</div>';
-  h += '<div class="r-line"></div>';
-  h += '<div>Commande N°' + snap.num + '</div><div>' + escapeHtml(snap.date) + '</div><div>Type : ' + escapeHtml(snap.type) + '</div>';
-  h += '<div class="r-line"></div>';
-  snap.lines.forEach(l => {
-    h += '<div class="r-row"><span>' + l.qty + 'x ' + escapeHtml(l.name) + '</span><span>' + euro(l.lineTotal) + '</span></div>';
-    if (l.detail) h += '<div class="r-detail">' + escapeHtml(l.detail) + '</div>';
-  });
-  h += '<div class="r-line"></div>';
-  if (snap.fee) {
-    h += '<div class="r-row"><span>Sous-total</span><span>' + euro(snap.subtotal) + '</span></div>';
-    h += '<div class="r-row"><span>Livraison</span><span>' + euro(snap.fee) + '</span></div>';
-  }
-  h += '<div class="r-row r-big"><span>TOTAL</span><span>' + euro(snap.total) + '</span></div>';
+  h += '<div class="rc-sep"></div>';
+  h += '<div class="r-big">Commande N°' + snap.num + '</div><div>' + escapeHtml(snap.type) + '</div>';
+  h += orderBodyHTML(snap);
+  h += orderTotalsHTML(snap);
   if (snap.delivery) {
-    h += '<div class="r-line"></div>';
-    h += '<div>Tel : ' + escapeHtml(snap.delivery.phone) + '</div><div>Adr : ' + escapeHtml(snap.delivery.address) + '</div>';
-    const pay = snap.delivery.payment;
-    if (pay) {
-      h += '<div>Paiement : ' + escapeHtml(pay.method) + '</div>';
-      if (pay.method === 'Espèces' && pay.received != null) {
-        h += '<div>Recu : ' + euro(pay.received) + '  |  Rendre : ' + euro(Math.max(0, pay.received - snap.total)) + '</div>';
-      }
-    }
+    h += '<div style="margin-top:8px">Tel : ' + escapeHtml(snap.delivery.phone)
+       + '<br>Adr : ' + escapeHtml(snap.delivery.address) + '</div>';
   }
-  h += '<div class="r-line"></div><div class="r-center">Merci et a bientot !</div></div>';
+  h += orderMetaHTML(snap);
+  h += '<div class="rc-sep"></div><div class="r-center">Merci pour votre commande !</div></div>';
   return h;
 }
 
@@ -1294,54 +1296,108 @@ function groupLines(lines){
   return groups;
 }
 
+function rcRow(q, label, unitPrice){ return { label: q + 'x ' + label, price: unitPrice * q }; }
+
+// Détaille un article en sections (PAIN / SAUCE / CRUDITÉS / EXTRAS...) comme sur le ticket
+function buildSections(a, q){
+  const item = a.item, secs = [];
+  if (a.size)        secs.push({ title: 'TAILLE',   rows: [ rcRow(q, a.size.label, 0) ] });
+  if (a.cuisson)     secs.push({ title: 'CUISSON',  rows: [ rcRow(q, a.cuisson, 0) ] });
+  if (a.viandes.length) secs.push({ title: 'VIANDES', rows: a.viandes.map(v => rcRow(q, v, 0)) });
+  if (a.pain)        secs.push({ title: 'PAIN',     rows: [ rcRow(q, a.pain === 'Galette' ? 'Galette' : 'Pain sandwich', 0) ] });
+  if (a.sauces.length) {
+    const free = item.sauceFree || 2;
+    secs.push({ title: 'SAUCE', rows: a.sauces.map((s, i) => rcRow(q, s, i < free ? 0 : 0.5)) });
+  }
+  if (item.flow.crudites) {
+    const rows = a.crudites.length ? a.crudites.map(c => rcRow(q, c.toLowerCase(), 0)) : [ { label: 'sans crudités', price: 0 } ];
+    secs.push({ title: 'CRUDITÉS', rows });
+  }
+  if (a.extras.length) secs.push({ title: 'EXTRAS', rows: a.extras.map(e => rcRow(q, e, EXTRA_PRICES[e] || 0)) });
+  return secs;
+}
+
 function snapshotOrder(){
   let subtotal = 0;
   const lines = groupLines(order.lines).map(g => {
-    const u = unitPrice(g.art);
-    const lineTotal = u * g.qty;
+    const a = g.art, q = g.qty;
+    const base = a.size ? a.size.price : a.item.price;
+    const unit = unitPrice(a);
+    const lineTotal = unit * q;
     subtotal += lineTotal;
-    return { qty: g.qty, name: articleName(g.art), detail: details(g.art), unit: u, lineTotal };
+    return {
+      qty: q,
+      title: (a.item.typeLabel ? a.item.typeLabel + ' ' : '') + a.item.name,
+      aggName: (a.item.typeLabel ? a.item.typeLabel + ' ' : '') + a.item.name + (a.size ? ' — ' + a.size.label : ''),
+      base, unit, lineTotal,
+      sections: buildSections(a, q)
+    };
   });
   const fee = order.delivery ? order.delivery.fee : 0;
+  const ts = Date.now();
   return {
     num: nextOrderNum(),
-    date: new Date().toLocaleString('fr-FR'),
+    ts,
+    date: new Date(ts).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
     type: order.type,
     delivery: order.delivery,
     lines, subtotal, fee, total: subtotal + fee
   };
 }
 
-function buildRecapHTML(snap){
-  let html = '<h3>Récapitulatif — ' + snap.type + (snap.num ? '  ·  N°' + snap.num : '') + '</h3><ul>';
+// ---- Rendu détaillé partagé (écran merci, historique, ticket imprimé) ----
+function orderBodyHTML(snap){
+  let h = '';
   snap.lines.forEach(l => {
-    html += '<li><div class="line-top"><span><strong>'
-          + (l.qty > 1 ? l.qty + 'x ' : '') + l.name + '</strong></span>'
-          + '<span class="line-price">' + euro(l.lineTotal) + '</span></div>';
-    if (l.detail) html += '<div class="line-detail">' + l.detail + '</div>';
-    if (l.qty > 1) html += '<div class="line-detail">' + euro(l.unit) + ' l\'unité</div>';
-    html += '</li>';
+    h += '<div class="rc-art">';
+    h += '<div class="rc-art-head"><span>' + l.qty + ' x ' + escapeHtml(l.title || l.name || '') + '</span>'
+       + '<span>' + euro((l.base != null ? l.base : l.unit || 0) * l.qty) + '</span></div>';
+    (l.sections || []).forEach(sec => {
+      h += '<div class="rc-sec">' + sec.title + '</div>';
+      sec.rows.forEach(r => {
+        h += '<div class="rc-opt"><span>' + escapeHtml(r.label) + '</span><span class="rc-price">' + euro(r.price) + '</span></div>';
+      });
+    });
+    if (!l.sections && l.detail) h += '<div class="rc-opt"><span>' + escapeHtml(l.detail) + '</span><span></span></div>';
+    h += '</div>';
   });
-  html += '</ul>';
+  return h;
+}
+function orderTotalsHTML(snap){
+  let h = '<div class="rc-sep"></div>';
+  h += '<div class="rc-tot"><span>Sous-total</span><span>' + euro(snap.subtotal) + '</span></div>';
   if (snap.fee) {
-    const km = (snap.delivery && snap.delivery.km != null) ? '  (' + snap.delivery.km.toFixed(1) + ' km)' : '';
-    html += '<div class="fee-row"><span>Sous-total</span><span>' + euro(snap.subtotal) + '</span></div>';
-    html += '<div class="fee-row"><span>Frais de livraison' + km + '</span><span>' + euro(snap.fee) + '</span></div>';
+    const km = (snap.delivery && snap.delivery.km != null) ? ' (' + snap.delivery.km.toFixed(1) + ' km)' : '';
+    h += '<div class="rc-tot"><span>Frais de livraison' + km + '</span><span>' + euro(snap.fee) + '</span></div>';
+    h += '<div class="rc-tot grand"><span>Total</span><span>' + euro(snap.total) + '</span></div>';
   }
-  html += '<div class="total-line"><span>Total</span><span>' + euro(snap.total) + '</span></div>';
+  const pay = snap.delivery && snap.delivery.payment;
+  let paid = snap.total, rendu = 0, label = 'Montant payé';
+  if (pay) {
+    label += ' (' + pay.method + ')';
+    if (pay.method === 'Espèces' && pay.received != null) { paid = pay.received; rendu = Math.max(0, pay.received - snap.total); }
+  }
+  h += '<div class="rc-tot"><span>' + label + '</span><span>' + euro(paid) + '</span></div>';
+  if (rendu > 0) h += '<div class="rc-tot"><span>À rendre</span><span>' + euro(rendu) + '</span></div>';
+  return h;
+}
+function orderMetaHTML(snap){
+  if (!snap.ts) return '<div class="rc-meta">Effectuée le ' + escapeHtml(snap.date || '') + '</div>';
+  const prep = settings.prepMinutes != null ? settings.prepMinutes : 15;
+  const t = new Date(snap.ts + prep * 60000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return '<div class="rc-meta">Effectuée le ' + escapeHtml(snap.date) + '<br>À préparer pour ' + t + '</div>';
+}
+
+function buildRecapHTML(snap){
+  let html = '<h3>Commande N°' + snap.num + ' — ' + escapeHtml(snap.type) + '</h3>';
+  html += orderBodyHTML(snap);
+  html += orderTotalsHTML(snap);
   if (snap.delivery) {
     html += '<div class="deliv-info"><strong>Livraison</strong><br>📞 ' + escapeHtml(snap.delivery.phone)
           + '<br>📍 ' + escapeHtml(snap.delivery.address) + '</div>';
-    const pay = snap.delivery.payment;
-    if (pay) {
-      html += '<div class="deliv-info"><strong>Paiement : ' + pay.method + '</strong>';
-      if (pay.method === 'Espèces' && pay.received != null) {
-        html += '<br>Reçu : ' + euro(pay.received)
-              + '<br><strong>À rendre : ' + euro(Math.max(0, pay.received - snap.total)) + '</strong>';
-      }
-      html += '</div>';
-    }
   }
+  html += orderMetaHTML(snap);
+  html += '<div class="rc-foot">Merci pour votre commande<br>' + escapeHtml(settings.shopName || '') + '</div>';
   return html;
 }
 
@@ -1437,6 +1493,7 @@ function openSettings(){
   document.getElementById('set-name').value = settings.shopName || '';
   document.getElementById('set-addr').value = settings.shopAddr || '';
   document.getElementById('set-phone').value = settings.shopPhone || '';
+  document.getElementById('set-prep').value = settings.prepMinutes != null ? settings.prepMinutes : 15;
   updateInstallHint();
   showScreen('screen-settings');
 }
@@ -1476,6 +1533,8 @@ function readSettingsFields(){
   settings.shopName = document.getElementById('set-name').value.trim() || 'Restaurant';
   settings.shopAddr = document.getElementById('set-addr').value.trim();
   settings.shopPhone = document.getElementById('set-phone').value.trim();
+  const p = parseInt(document.getElementById('set-prep').value, 10);
+  settings.prepMinutes = (!isNaN(p) && p >= 0) ? p : 15;
 }
 document.getElementById('set-save').addEventListener('click', () => {
   settings.autoPrint = document.getElementById('set-autoprint').checked;
@@ -1485,11 +1544,26 @@ document.getElementById('set-save').addEventListener('click', () => {
 });
 document.getElementById('set-test-print').addEventListener('click', () => {
   readSettingsFields();   // utilise les valeurs saisies pour l'aperçu
+  const now = Date.now();
   printReceipt({
-    num: '000', date: new Date().toLocaleString('fr-FR'), type: 'Sur place',
-    lines: [{ qty: 1, name: 'Kebab Maison', detail: 'Sauce : Ketchup · Salade, Tomate', lineTotal: 7.5 },
-            { qty: 2, name: 'Cheddar — 150g', detail: 'Cuisson : Saignant', lineTotal: 17 }],
-    subtotal: 24.5, fee: 0, total: 24.5, delivery: null
+    num: '000', ts: now,
+    date: new Date(now).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
+    type: 'Sur place',
+    lines: [
+      { qty: 1, title: 'Sandwich Kebab Maison', base: 7.5, unit: 7.5, lineTotal: 7.5, sections: [
+        { title: 'PAIN', rows: [{ label: '1x Pain sandwich', price: 0 }] },
+        { title: 'SAUCE', rows: [{ label: '1x Mayonnaise', price: 0 }, { label: '1x Ketchup', price: 0 }] },
+        { title: 'CRUDITÉS', rows: [{ label: '1x salade', price: 0 }, { label: '1x tomate', price: 0 }, { label: '1x oignons', price: 0 }] }
+      ]},
+      { qty: 1, title: 'Burger Cheddar', base: 8.5, unit: 9.5, lineTotal: 9.5, sections: [
+        { title: 'TAILLE', rows: [{ label: '1x 150g', price: 0 }] },
+        { title: 'CUISSON', rows: [{ label: '1x Saignant', price: 0 }] },
+        { title: 'SAUCE', rows: [{ label: '1x Samouraï', price: 0 }] },
+        { title: 'CRUDITÉS', rows: [{ label: '1x salade', price: 0 }] },
+        { title: 'EXTRAS', rows: [{ label: '1x Bacon', price: 1 }] }
+      ]}
+    ],
+    subtotal: 17, fee: 0, total: 17, delivery: null
   });
 });
 
@@ -1507,9 +1581,10 @@ function renderRecap(){
   history.forEach(snap => {
     feesTotal += snap.fee || 0;
     snap.lines.forEach(l => {
-      if (!agg[l.name]) agg[l.name] = { qty: 0, revenue: 0 };
-      agg[l.name].qty += l.qty;
-      agg[l.name].revenue += l.lineTotal;
+      const key = l.aggName || l.name || l.title || 'Article';
+      if (!agg[key]) agg[key] = { qty: 0, revenue: 0 };
+      agg[key].qty += l.qty;
+      agg[key].revenue += l.lineTotal;
       articlesTotal += l.lineTotal;
       articlesCount += l.qty;
     });
@@ -1607,7 +1682,7 @@ document.getElementById('stock-save').addEventListener('click', () => {
 });
 
 // ===================== INIT =====================
-MENU.forEach(cat => cat.items.forEach(it => it.needs = deriveNeeds(it)));
+MENU.forEach(cat => cat.items.forEach(it => { it.needs = deriveNeeds(it); it.typeLabel = cat.type || ''; }));
 buildStockLinks();
 buildProductList();
 updateCart();
