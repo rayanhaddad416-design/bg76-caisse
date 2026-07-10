@@ -210,6 +210,21 @@
   .delivery-form input:focus, .delivery-form textarea:focus { outline: none; border-color: #0637c8; }
   .delivery-form textarea { min-height: 90px; resize: vertical; }
 
+  /* Autocomplétion d'adresse (style GPS) */
+  .addr-wrap { position: relative; }
+  .addr-suggest {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 40; margin-top: 4px;
+    background: #fff; border: 2px solid #cfd6e6; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18); max-height: 260px; overflow-y: auto;
+  }
+  .addr-item { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+  .addr-item:last-child { border-bottom: none; }
+  .addr-item:hover, .addr-item.active { background: #f0f4ff; }
+  .addr-item .ai-ic { flex-shrink: 0; font-size: 16px; }
+  .addr-item .ai-main { font-weight: 600; color: #222; }
+  .addr-item .ai-sub { font-size: 12.5px; color: #777; font-weight: 400; }
+  .addr-item.saved .ai-main { color: #0637c8; }
+
   .calc-btn { align-self: flex-start; padding: 12px 20px; font-size: 16px; }
   .fee-box { background: #f4f5f7; border-radius: 10px; padding: 14px 16px; font-size: 14px; display: flex; flex-direction: column; gap: 10px; }
   .fee-status { color: #555; }
@@ -445,7 +460,10 @@
         <input type="tel" id="deliv-phone" placeholder="06 12 34 56 78" autocomplete="off">
       </label>
       <label>Adresse de livraison
-        <textarea id="deliv-address" placeholder="N°, rue, code postal, ville"></textarea>
+        <div class="addr-wrap">
+          <textarea id="deliv-address" placeholder="Commencez à taper l'adresse…" autocomplete="off"></textarea>
+          <div class="addr-suggest hidden" id="addr-suggest"></div>
+        </div>
       </label>
       <button type="button" class="btn btn-outline calc-btn" id="calc-fee">📍 Calculer la distance &amp; les frais</button>
       <div class="fee-box">
@@ -682,6 +700,32 @@ function nextOrderNum(){
   const n = Math.max(maxCloud, localSeq) + 1;
   try { localStorage.setItem(SEQ_KEY, String(n)); } catch (e) {}
   return n;
+}
+
+// ===================== ADRESSES CLIENTS (mémorisées, synchronisées) =====================
+const ADDR_KEY = 'bg76_addresses';
+let savedAddresses = loadAddresses();
+
+function loadAddresses(){
+  try { return JSON.parse(localStorage.getItem(ADDR_KEY)) || []; }
+  catch (e) { return []; }
+}
+function normAddrKey(a){ return (a || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 140) || 'addr'; }
+
+// Mémorise l'adresse d'une commande livrée finie (locale + cloud)
+function rememberAddress(delivery){
+  if (!delivery || !delivery.address) return;
+  const entry = {
+    address: delivery.address, phone: delivery.phone || '',
+    lat: (delivery.lat != null ? delivery.lat : null),
+    lon: (delivery.lon != null ? delivery.lon : null),
+    ts: Date.now()
+  };
+  const key = normAddrKey(delivery.address);
+  savedAddresses = savedAddresses.filter(a => normAddrKey(a.address) !== key);
+  savedAddresses.unshift(entry);
+  try { localStorage.setItem(ADDR_KEY, JSON.stringify(savedAddresses.slice(0, 300))); } catch (e) {}
+  if (cloudOn && db) db.collection('addresses').doc(key).set(entry, { merge: true }).catch(() => {});
 }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -1257,30 +1301,92 @@ document.getElementById('pay-cb').addEventListener('click', () => selectPay('CB'
 document.getElementById('pay-cash').addEventListener('click', () => selectPay('Espèces'));
 document.getElementById('pay-received').addEventListener('input', updatePayDisplay);
 
+// Calcule la distance/frais à partir de coordonnées connues (adresse choisie ou géocodée)
+async function applyDistance(dest){
+  if (!restoCoords) { try { restoCoords = await geocodeOnce(RESTO_ADDRESS); } catch (e) { restoCoords = RESTO_FALLBACK; } }
+  let km, source;
+  try { km = await roadKm(restoCoords, dest); source = 'par la route'; }
+  catch (e) { km = haversineKm(restoCoords, dest); source = 'à vol d’oiseau'; }
+  deliveryCalc = { km, fee: feeFromKm(km), source, lat: dest.lat, lon: dest.lon };
+  document.getElementById('fee-km').value = km.toFixed(1);
+  const status = document.getElementById('fee-status');
+  status.className = 'fee-status ok';
+  status.textContent = 'Distance : ' + km.toFixed(1) + ' km (' + source + ').';
+  updateFeeDisplay();
+}
+
 document.getElementById('calc-fee').addEventListener('click', async () => {
   const addr = document.getElementById('deliv-address').value.trim();
   const status = document.getElementById('fee-status');
   const btn = document.getElementById('calc-fee');
   if (!addr) { status.className = 'fee-status err'; status.textContent = "Renseignez d'abord l'adresse."; return; }
   status.className = 'fee-status'; status.textContent = 'Calcul en cours…'; btn.disabled = true;
-  try {
-    const dest = await geocode(addr);
-    if (!restoCoords) { try { restoCoords = await geocodeOnce(RESTO_ADDRESS); } catch (e) { restoCoords = RESTO_FALLBACK; } }
-    let km, source;
-    try { km = await roadKm(restoCoords, dest); source = 'par la route'; }
-    catch (e) { km = haversineKm(restoCoords, dest); source = 'à vol d’oiseau'; }
-    deliveryCalc = { km, fee: feeFromKm(km), source };
-    document.getElementById('fee-km').value = km.toFixed(1);
-    status.className = 'fee-status ok';
-    status.textContent = 'Distance : ' + km.toFixed(1) + ' km (' + source + ').';
-    updateFeeDisplay();
-  } catch (e) {
+  try { await applyDistance(await geocode(addr)); }
+  catch (e) {
     status.className = 'fee-status err';
     status.textContent = 'Calcul auto impossible (' + e.message + '). Saisissez la distance à la main.';
-  } finally {
-    btn.disabled = false;
-  }
+  } finally { btn.disabled = false; }
 });
+
+// ---- Autocomplétion d'adresse (suggestions carto + adresses mémorisées) ----
+let addrTimer = null;
+
+async function addrSearch(q){
+  // Photon (komoot) : fait pour l'autocomplétion, résultats propres, biaisés vers Elbeuf
+  try {
+    const url = 'https://photon.komoot.io/api/?limit=6&lang=fr&lat=49.286&lon=1.006&q=' + encodeURIComponent(q);
+    const data = await (await fetch(url)).json();
+    const list = (data.features || []).map(f => {
+      const p = f.properties || {}, c = f.geometry && f.geometry.coordinates;
+      const l1 = [p.housenumber, p.street || p.name].filter(Boolean).join(' ');
+      const l2 = [p.postcode, p.city || p.town || p.village].filter(Boolean).join(' ');
+      const label = [l1, l2].filter(Boolean).join(', ');
+      return c ? { label: label || (p.name || ''), lat: c[1], lon: c[0] } : null;
+    }).filter(s => s && s.label);
+    if (list.length) return list;
+  } catch (e) {}
+  // Repli : Nominatim
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=fr&q=' + encodeURIComponent(q);
+    const data = await (await fetch(url, { headers: { 'Accept': 'application/json' } })).json();
+    return data.map(d => ({ label: d.display_name.split(',').slice(0, 4).join(',').trim(), lat: parseFloat(d.lat), lon: parseFloat(d.lon) }));
+  } catch (e) { return []; }
+}
+
+function hideAddrSuggest(){ document.getElementById('addr-suggest').classList.add('hidden'); }
+
+function noAccent(s){ return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+async function showAddrSuggest(q){
+  const box = document.getElementById('addr-suggest');
+  const qn = noAccent(q);
+  const saved = savedAddresses.filter(a => noAccent(a.address).includes(qn)).slice(0, 4);
+  const geo = await addrSearch(q);
+  if (document.getElementById('deliv-address').value.trim() !== q) return;   // l'utilisateur a continué à taper
+
+  box.innerHTML = '';
+  const add = (item, isSaved) => {
+    const el = document.createElement('div');
+    el.className = 'addr-item' + (isSaved ? ' saved' : '');
+    el.innerHTML = '<span class="ai-ic">' + (isSaved ? '🕘' : '📍') + '</span>'
+      + '<span><span class="ai-main">' + escapeHtml(item.address) + '</span>'
+      + (item.sub ? '<br><span class="ai-sub">' + escapeHtml(item.sub) + '</span>' : '') + '</span>';
+    el.addEventListener('mousedown', e => { e.preventDefault(); selectAddr(item); });
+    box.appendChild(el);
+  };
+  saved.forEach(a => add({ address: a.address, sub: a.phone ? '📞 ' + a.phone : 'Adresse enregistrée', phone: a.phone, lat: a.lat, lon: a.lon }, true));
+  geo.forEach(g => add({ address: g.label, sub: '', lat: g.lat, lon: g.lon }, false));
+
+  box.classList.toggle('hidden', box.children.length === 0);
+}
+
+function selectAddr(item){
+  document.getElementById('deliv-address').value = item.address;
+  if (item.phone && !document.getElementById('deliv-phone').value.trim()) document.getElementById('deliv-phone').value = item.phone;
+  hideAddrSuggest();
+  if (item.lat != null && item.lon != null) applyDistance({ lat: item.lat, lon: item.lon });
+  else { deliveryCalc = null; updateFeeDisplay(); }
+  validateDelivery();
+}
 
 document.getElementById('fee-km').addEventListener('input', () => {
   const km = parseFloat(document.getElementById('fee-km').value);
@@ -1294,8 +1400,9 @@ function showDelivery(){
   const prev = order.delivery;
   document.getElementById('deliv-phone').value = prev ? prev.phone : '';
   document.getElementById('deliv-address').value = prev ? prev.address : '';
-  deliveryCalc = prev ? { km: prev.km, fee: prev.fee, source: prev.source } : null;
+  deliveryCalc = prev ? { km: prev.km, fee: prev.fee, source: prev.source, lat: prev.lat, lon: prev.lon } : null;
   document.getElementById('fee-km').value = deliveryCalc ? deliveryCalc.km.toFixed(1) : '';
+  hideAddrSuggest();
   const status = document.getElementById('fee-status');
   status.className = 'fee-status';
   status.textContent = deliveryCalc ? 'Distance : ' + deliveryCalc.km.toFixed(1) + ' km.' : 'Distance non calculée.';
@@ -1327,7 +1434,13 @@ document.getElementById('deliv-address').addEventListener('input', () => {
   status.className = 'fee-status'; status.textContent = 'Distance non calculée.';
   document.getElementById('fee-km').value = '';
   updateFeeDisplay();
+  // Suggestions (avec un petit délai pour ne pas interroger à chaque lettre)
+  const q = document.getElementById('deliv-address').value.trim();
+  clearTimeout(addrTimer);
+  if (q.length < 3) { hideAddrSuggest(); return; }
+  addrTimer = setTimeout(() => showAddrSuggest(q), 350);
 });
+document.getElementById('deliv-address').addEventListener('blur', () => setTimeout(hideAddrSuggest, 150));
 document.getElementById('deliv-back').addEventListener('click', () => showConfirm());
 document.getElementById('deliv-done').addEventListener('click', () => {
   const payment = payMethod === 'Espèces'
@@ -1337,6 +1450,8 @@ document.getElementById('deliv-done').addEventListener('click', () => {
     phone: document.getElementById('deliv-phone').value.trim(),
     address: document.getElementById('deliv-address').value.trim(),
     km: deliveryCalc.km, fee: deliveryCalc.fee, source: deliveryCalc.source,
+    lat: (deliveryCalc.lat != null ? deliveryCalc.lat : null),
+    lon: (deliveryCalc.lon != null ? deliveryCalc.lon : null),
     payment
   };
   finalize();
@@ -1462,6 +1577,7 @@ function buildRecapHTML(snap){
 function completeOrder(){
   const snap = snapshotOrder();
   lastSnap = snap;
+  if (order.delivery) rememberAddress(order.delivery);   // mémorise l'adresse du client
   if (cloudOn && db) {
     // Le cloud est la source : l'écoute temps réel remettra la commande dans l'historique
     db.collection('orders').add(snap).catch(() => { history.unshift(snap); saveHistory(); });
@@ -1792,6 +1908,12 @@ function initCloud(){
       const active = document.querySelector('.screen:not(.hidden)');
       const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest('.settings-form');
       if (active && active.id === 'screen-settings' && !editing) fillSettingsFields();
+    }, () => {});
+
+    // Adresses clients en temps réel (mémorisées entre appareils)
+    db.collection('addresses').orderBy('ts', 'desc').limit(500).onSnapshot(snap => {
+      savedAddresses = snap.docs.map(d => d.data());
+      try { localStorage.setItem(ADDR_KEY, JSON.stringify(savedAddresses)); } catch (e) {}
     }, () => {});
 
     // Historique en temps réel : chaque commande finie apparaît sur tous les appareils
