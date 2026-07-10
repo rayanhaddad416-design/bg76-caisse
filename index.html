@@ -15,6 +15,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="BG76 Caisse">
 
+<!-- Firebase (synchro cloud du stock et de l'historique) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
 
@@ -65,10 +69,20 @@
     display: flex;
     flex-direction: column;
     position: relative;
+    overflow: hidden;
   }
+
+  /* Chaque écran remplit la carte : la zone qui défile reste bornée (pas de débordement) */
+  .screen { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
   .step-title { font-size: 26px; font-weight: 700; text-align: center; margin-bottom: 6px; }
   .step-sub { text-align: center; color: #666; margin-bottom: 22px; font-size: 15px; min-height: 20px; }
+
+  /* Décorations vagues bleues (écran d'accueil) */
+  .deco { position: absolute; z-index: 0; pointer-events: none; width: 34%; max-width: 340px; height: auto; }
+  .deco-tr { top: 0; right: 0; }
+  .deco-bl { bottom: 0; left: 0; }
+  #screen-type .step-title, #screen-type .step-sub, #screen-type .options, #screen-type .bottom-bar { position: relative; z-index: 1; }
 
   /* Ecrans plein-centre (type, pain, cuisson) */
   .options {
@@ -336,6 +350,16 @@
 
   <!-- ECRAN 1 : Type de commande -->
   <div class="screen" id="screen-type">
+    <svg class="deco deco-tr" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M300,0 V210 C250,205 240,120 175,140 C120,157 95,95 140,60 C180,30 175,0 175,0 Z" fill="#0637c8"/>
+      <path d="M300,0 V150 C255,150 250,85 190,95 C140,103 150,30 200,25 C245,20 240,0 240,0 Z" fill="#1e5fd6" opacity="0.55"/>
+      <path d="M300,40 V95 C275,95 270,55 235,60 C205,64 215,35 245,35 Z" fill="#6ea8ff" opacity="0.5"/>
+    </svg>
+    <svg class="deco deco-bl" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M0,300 V95 C55,100 60,190 130,168 C185,150 210,215 160,250 C120,278 130,300 130,300 Z" fill="#0637c8"/>
+      <path d="M0,300 V150 C50,152 55,225 120,213 C170,204 160,272 110,277 C70,281 75,300 75,300 Z" fill="#1e5fd6" opacity="0.55"/>
+      <path d="M0,255 V205 C28,207 32,245 70,240 C100,236 90,268 60,266 Z" fill="#6ea8ff" opacity="0.5"/>
+    </svg>
     <div class="step-title">Type de commande</div>
     <div class="step-sub">Choisissez une option puis cliquez sur Suivant</div>
     <div class="options" id="opts-type">
@@ -514,7 +538,7 @@
 <script>
 // ===================== DONNEES DU MENU =====================
 const VIANDES  = ["Kebab Maison", "Poulet", "Merguez", "Steak", "Tenders", "Nuggets", "Cordon Bleu"];
-const CUISSONS = ["Bleu", "Saignant", "Bien cuit"];
+const CUISSONS = ["Bleu", "Saignant", "À point", "Bien cuit"];
 const SAUCES   = ["Samouraï","Algérienne","Blanche","Biggy","Curry","Harissa","Andalouse","Barbecue","Mayonnaise","Ketchup","Poivre"];
 const CRUDITES = ["Salade", "Tomate", "Oignons"];
 const EXTRAS   = ["Cheddar fondu","Cheddar","Gouda","Boursin","Bacon","Avocat","Œuf"];
@@ -562,7 +586,7 @@ const MENU = [
         {label:"2XL — 4 viandes",price:15.50,viandes:4},
         {label:"3XL — 5 viandes",price:19.50,viandes:5}
       ],
-      flow:{viandes:true,sauce:true,extras:true} },
+      flow:{viandes:true,sauce:true,crudites:true,extras:true} },
   ]},
   { title: "Nos Assiettes", items: [
     { id:"assiette-1", name:"Assiette 1 viande",  desc:"1 viande au choix, crudités, frites", price:9.00,  flow:{viandes:1,sauce:true,crudites:true,extras:true} },
@@ -596,6 +620,20 @@ let flow = [];             // liste des étapes de l'article
 let stepIndex = 0;
 let selectedProductId = null;
 let currentOrderScreen = 'screen-type';
+let swRefreshing = false;    // évite les rechargements en boucle
+let swUpdateReady = false;   // une MAJ attend d'être appliquée (hors commande)
+
+// ===================== CLOUD (Firebase Firestore) =====================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC7tx1OCSpUa4AooQiIgqyPwDsVbjlI3k0",
+  authDomain: "bg76-caisse.firebaseapp.com",
+  projectId: "bg76-caisse",
+  storageBucket: "bg76-caisse.firebasestorage.app",
+  messagingSenderId: "969505483072",
+  appId: "1:969505483072:web:abbb72141d8505a9daf2a5"
+};
+let db = null;          // Firestore
+let cloudOn = false;    // true si la synchro cloud est active
 
 // ===================== STOCK (persistant) =====================
 const STOCK_KEY = 'bg76_out_of_stock';
@@ -607,6 +645,7 @@ function loadStock(){
   catch (e) { return new Set(); }
 }
 function saveStock(){
+  if (cloudOn && db) db.collection('app').doc('stock').set({ list: [...outOfStock] }).catch(() => {});
   try { localStorage.setItem(STOCK_KEY, JSON.stringify([...outOfStock])); return true; }
   catch (e) { return false; }   // certains navigateurs bloquent localStorage : on n'interrompt pas
 }
@@ -624,9 +663,11 @@ function saveHistory(){
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) {}
 }
 function nextOrderNum(){
-  let n = 0;
-  try { n = parseInt(localStorage.getItem(SEQ_KEY) || '0', 10) || 0; } catch (e) {}
-  n++;
+  // Numéro = max(historique synchronisé, compteur local) + 1  → cohérent entre appareils
+  const maxCloud = history.reduce((m, o) => Math.max(m, o.num || 0), 0);
+  let localSeq = 0;
+  try { localSeq = parseInt(localStorage.getItem(SEQ_KEY) || '0', 10) || 0; } catch (e) {}
+  const n = Math.max(maxCloud, localSeq) + 1;
   try { localStorage.setItem(SEQ_KEY, String(n)); } catch (e) {}
   return n;
 }
@@ -782,6 +823,8 @@ function groupKey(a){
 
 const SIDE_SCREENS = { 'screen-stock': 'stock', 'screen-history': 'history', 'screen-recap': 'recap', 'screen-settings': 'settings' };
 function showScreen(id){
+  // Applique une MAJ en attente quand on revient à l'écran d'accueil (jamais en pleine commande)
+  if (id === 'screen-type' && swUpdateReady && !swRefreshing) { swRefreshing = true; location.reload(); return; }
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
   if (!SIDE_SCREENS[id]) currentOrderScreen = id;   // on ne mémorise pas les écrans annexes comme écran de commande
@@ -1403,9 +1446,14 @@ function buildRecapHTML(snap){
 
 function completeOrder(){
   const snap = snapshotOrder();
-  history.unshift(snap);      // la plus récente en premier
-  saveHistory();
   lastSnap = snap;
+  if (cloudOn && db) {
+    // Le cloud est la source : l'écoute temps réel remettra la commande dans l'historique
+    db.collection('orders').add(snap).catch(() => { history.unshift(snap); saveHistory(); });
+  } else {
+    history.unshift(snap);      // la plus récente en premier
+    saveHistory();
+  }
   document.getElementById('recap').innerHTML = buildRecapHTML(snap);
   showScreen('screen-merci');
   if (settings.autoPrint) setTimeout(() => printReceipt(snap), 300);   // impression auto
@@ -1667,6 +1715,13 @@ document.getElementById('history-clear').addEventListener('click', (e) => {
   }
   clearArmed = false;
   btn.textContent = "Vider l'historique";
+  if (cloudOn && db) {
+    db.collection('orders').get().then(s => {
+      const batch = db.batch();
+      s.docs.forEach(d => batch.delete(d.ref));
+      return batch.commit();
+    }).catch(() => {});
+  }
   history = [];
   saveHistory();
   renderHistory();
@@ -1681,18 +1736,63 @@ document.getElementById('stock-save').addEventListener('click', () => {
   showToast(persisted ? '✓ Stock enregistré' : '✓ Enregistré (cette session seulement)');
 });
 
+// ===================== CLOUD : connexion + synchro temps réel =====================
+function initCloud(){
+  try {
+    if (typeof firebase === 'undefined' || !FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey.indexOf('AIza') !== 0) return;
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    db.enablePersistence({ synchronizeTabs: true }).catch(() => {});   // marche hors-ligne, resynchronise
+    cloudOn = true;
+
+    // Stock en temps réel : toute rupture faite sur une caisse arrive ici
+    db.collection('app').doc('stock').onSnapshot(doc => {
+      const data = doc.data();
+      if (!data || !Array.isArray(data.list)) return;
+      outOfStock = new Set(data.list);
+      try { localStorage.setItem(STOCK_KEY, JSON.stringify([...outOfStock])); } catch (e) {}
+      buildProductList();
+    }, () => {});
+
+    // Historique en temps réel : chaque commande finie apparaît sur tous les appareils
+    db.collection('orders').orderBy('ts', 'desc').limit(1000).onSnapshot(snap => {
+      history = snap.docs.map(d => d.data());
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) {}
+      const active = document.querySelector('.screen:not(.hidden)');
+      if (active && active.id === 'screen-history') renderHistory();
+      if (active && active.id === 'screen-recap') renderRecap();
+    }, () => {});
+  } catch (e) { cloudOn = false; }
+}
+
 // ===================== INIT =====================
 MENU.forEach(cat => cat.items.forEach(it => { it.needs = deriveNeeds(it); it.typeLabel = cat.type || ''; }));
 buildStockLinks();
 buildProductList();
 updateCart();
 setActiveNav('order');
+initCloud();
 
-// ===================== PWA : service worker =====================
+// ===================== PWA : service worker + mise à jour automatique =====================
 // Actif seulement en http(s) — en ouverture directe du fichier (file://), l'app marche comme avant sans lui.
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost','127.0.0.1'].includes(location.hostname))) {
+  const hadController = !!navigator.serviceWorker.controller;   // false au tout premier install
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // Vérifie régulièrement s'il y a une nouvelle version en ligne
+      setInterval(() => reg.update(), 120000);   // toutes les 2 min
+    }).catch(() => {});
+  });
+
+  // Quand une nouvelle version prend le contrôle : on recharge pour l'appliquer,
+  // mais jamais en pleine commande (on attend le retour à l'écran d'accueil).
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swRefreshing || !hadController) return;
+    const busy = typeof order !== 'undefined' && order && (order.lines.length > 0 || art);
+    if (busy) { swUpdateReady = true; return; }
+    swRefreshing = true;
+    location.reload();
   });
 }
 </script>
