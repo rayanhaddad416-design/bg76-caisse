@@ -527,7 +527,7 @@
           <div class="printer-box">
             <div class="printer-status" id="printer-status">🔴 Aucune imprimante connectée</div>
             <button type="button" class="btn btn-blue" id="btn-connect-printer">🖨️ Connecter l'imprimante Bluetooth</button>
-            <div class="printer-hint">Imprimante thermique Bluetooth (ex. Epson TM-m30II) — Android uniquement.</div>
+            <div class="printer-hint">Impression directe pour une imprimante Bluetooth <b>BLE</b> (Android). Les imprimantes réseau ou Bluetooth « classique » (ex. Epson TM-m30II) passent par la fenêtre d'impression Android.</div>
           </div>
           <label class="switch-row">
             <span>Imprimer automatiquement chaque commande finie</span>
@@ -886,12 +886,14 @@ function buildEscPos(snap){
 
 async function printReceipt(snap){
   if (!snap) return;
+  // 1) Si une imprimante Bluetooth BLE est connectée -> impression directe silencieuse
   if (btChar) {
-    try { await sendToPrinter(buildEscPos(snap)); showToast('✓ Ticket imprimé'); }
-    catch (e) { btChar = null; setPrinterStatus('Imprimante déconnectée', false); showToast("Impossible d'imprimer (imprimante injoignable)"); }
-    return;
+    try { await sendToPrinter(buildEscPos(snap)); showToast('✓ Ticket imprimé'); return; }
+    catch (e) { btChar = null; setPrinterStatus('Imprimante déconnectée', false); }
   }
-  showToast("Impossible d'imprimer — connectez l'imprimante dans Paramètres");
+  // 2) Sinon -> fenêtre d'impression Android (imprimante réseau / Bluetooth classique comme la TM-m30II)
+  document.getElementById('print-area').innerHTML = buildReceiptHTML(snap);
+  window.print();
 }
 
 // Ingrédients (viandes) fixes contenus dans un produit — déduit du nom/description
