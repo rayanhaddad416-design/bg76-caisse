@@ -278,7 +278,8 @@
   .toast.fade { opacity: 0; }
 
   /* Paramètres */
-  .settings-form { display: flex; flex-direction: column; gap: 18px; max-width: 560px; margin: 4px auto 0; width: 100%; }
+  .settings-form { display: flex; flex-direction: column; gap: 8px; max-width: 560px; margin: 4px auto 0; width: 100%; }
+  .set-sec { display: flex; flex-direction: column; gap: 16px; padding: 6px 4px 12px; }
   .settings-form label { display: flex; flex-direction: column; gap: 8px; font-weight: 700; font-size: 15px; }
   .settings-form input[type="text"] { font-size: 16px; padding: 13px; border: 2px solid #cfd6e6; border-radius: 10px; font-family: inherit; }
   .settings-form input:focus { outline: none; border-color: #0637c8; }
@@ -499,29 +500,40 @@
     <div class="step-sub">Impression des tickets de commande</div>
     <div class="scroll-wrap">
       <div class="settings-form">
-        <label class="switch-row">
-          <span>Imprimer automatiquement chaque commande finie</span>
-          <input type="checkbox" id="set-autoprint">
-        </label>
-        <label>Nom du restaurant (sur le ticket)
-          <input type="text" id="set-name" placeholder="Burger Grill 76">
-        </label>
-        <label>Adresse (sur le ticket)
-          <input type="text" id="set-addr" placeholder="39 Rue de la République, 76500 Elbeuf">
-        </label>
-        <label>Téléphone (sur le ticket)
-          <input type="text" id="set-phone" placeholder="02 xx xx xx xx">
-        </label>
-        <label>Temps de préparation (minutes)
-          <input type="number" id="set-prep" min="0" step="1" placeholder="15">
-        </label>
-        <button type="button" class="btn btn-outline" id="set-test-print">🖨️ Imprimer un ticket de test</button>
 
-        <div class="install-box">
-          <div class="install-title">Installer l'application</div>
-          <button type="button" class="btn btn-blue" id="btn-install" style="display:none">📲 Installer sur cet appareil</button>
-          <div class="install-hint" id="install-hint"></div>
+        <button type="button" class="cat-header set-acc"><span class="chevron">▸</span><span>🖨️ Impression</span></button>
+        <div class="set-sec hidden">
+          <label class="switch-row">
+            <span>Imprimer automatiquement chaque commande finie</span>
+            <input type="checkbox" id="set-autoprint">
+          </label>
+          <label>Temps de préparation (minutes)
+            <input type="number" id="set-prep" min="0" step="1" placeholder="15">
+          </label>
+          <button type="button" class="btn btn-outline" id="set-test-print">🖨️ Imprimer un ticket de test</button>
         </div>
+
+        <button type="button" class="cat-header set-acc"><span class="chevron">▸</span><span>🏪 Infos du ticket</span></button>
+        <div class="set-sec hidden">
+          <label>Nom du restaurant (sur le ticket)
+            <input type="text" id="set-name" placeholder="Burger Grill 76">
+          </label>
+          <label>Adresse (sur le ticket)
+            <input type="text" id="set-addr" placeholder="39 Rue de la République, 76500 Elbeuf">
+          </label>
+          <label>Téléphone (sur le ticket)
+            <input type="text" id="set-phone" placeholder="02 xx xx xx xx">
+          </label>
+        </div>
+
+        <button type="button" class="cat-header set-acc"><span class="chevron">▸</span><span>📲 Installer l'application</span></button>
+        <div class="set-sec hidden">
+          <div class="install-box">
+            <button type="button" class="btn btn-blue" id="btn-install" style="display:none">📲 Installer sur cet appareil</button>
+            <div class="install-hint" id="install-hint"></div>
+          </div>
+        </div>
+
       </div>
     </div>
     <div class="bottom-bar">
@@ -1551,6 +1563,17 @@ function openSettings(){
   updateInstallHint();
   showScreen('screen-settings');
 }
+
+// Sections dépliables des Paramètres (comme les catégories de produits)
+document.querySelectorAll('.set-acc').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sec = btn.nextElementSibling;
+    const willOpen = sec.classList.contains('hidden');
+    sec.classList.toggle('hidden', !willOpen);
+    btn.classList.toggle('open', willOpen);
+    btn.querySelector('.chevron').textContent = willOpen ? '▾' : '▸';
+  });
+});
 
 // ----- Installation de l'app (PWA) -----
 let deferredInstall = null;
