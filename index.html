@@ -295,6 +295,9 @@
   /* Paramètres */
   .settings-form { display: flex; flex-direction: column; gap: 8px; max-width: 560px; margin: 4px auto 0; width: 100%; }
   .set-sec { display: flex; flex-direction: column; gap: 16px; padding: 6px 4px 12px; }
+  .printer-box { background: #f4f5f7; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .printer-status { font-weight: 700; font-size: 15px; }
+  .printer-hint { font-size: 12.5px; color: #777; }
   .settings-form label { display: flex; flex-direction: column; gap: 8px; font-weight: 700; font-size: 15px; }
   .settings-form input[type="text"] { font-size: 16px; padding: 13px; border: 2px solid #cfd6e6; border-radius: 10px; font-family: inherit; }
   .settings-form input:focus { outline: none; border-color: #0637c8; }
@@ -521,6 +524,11 @@
 
         <button type="button" class="cat-header set-acc"><span class="chevron">▸</span><span>🖨️ Impression</span></button>
         <div class="set-sec hidden">
+          <div class="printer-box">
+            <div class="printer-status" id="printer-status">🔴 Aucune imprimante connectée</div>
+            <button type="button" class="btn btn-blue" id="btn-connect-printer">🖨️ Connecter l'imprimante Bluetooth</button>
+            <div class="printer-hint">Imprimante thermique Bluetooth (ex. Epson TM-m30II) — Android uniquement.</div>
+          </div>
           <label class="switch-row">
             <span>Imprimer automatiquement chaque commande finie</span>
             <input type="checkbox" id="set-autoprint">
@@ -765,10 +773,125 @@ function buildReceiptHTML(snap){
   return h;
 }
 
-function printReceipt(snap){
+// ===================== IMPRIMANTE BLUETOOTH (ESC/POS) =====================
+let btPrinter = null, btChar = null;
+const PRINTER_SERVICES = [
+  0x18F0,
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  '0000ff00-0000-1000-8000-00805f9b34fb',
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000ffe0-0000-1000-8000-00805f9b34fb'
+];
+const PRINT_W = 48;   // colonnes d'une imprimante 80 mm (TM-m30II, police A)
+
+function stripAccents(s){ return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function setPrinterStatus(txt, ok){
+  const el = document.getElementById('printer-status');
+  if (el) el.textContent = (ok ? '🟢 ' : '🔴 ') + txt;
+}
+
+async function connectPrinter(){
+  if (!navigator.bluetooth) { showToast('Bluetooth non disponible (Android + Chrome requis)'); return; }
+  const btn = document.getElementById('btn-connect-printer');
+  try {
+    setPrinterStatus('Connexion…', false); btn.disabled = true;
+    const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: PRINTER_SERVICES });
+    const server = await device.gatt.connect();
+    let found = null;
+    for (const uuid of PRINTER_SERVICES) {
+      try {
+        const svc = await server.getPrimaryService(uuid);
+        const chars = await svc.getCharacteristics();
+        found = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+        if (found) break;
+      } catch (e) {}
+    }
+    if (!found) { setPrinterStatus('Imprimante non compatible impression directe', false); showToast('Imprimante trouvée mais non compatible'); return; }
+    btPrinter = device; btChar = found;
+    device.addEventListener('gattserverdisconnected', () => { btChar = null; setPrinterStatus('Imprimante déconnectée', false); });
+    setPrinterStatus((device.name || 'Imprimante') + ' connectée', true);
+    showToast('✓ Imprimante connectée');
+  } catch (e) {
+    setPrinterStatus('Aucune imprimante connectée', false);
+    if (e && e.name !== 'NotFoundError') showToast('Connexion échouée');
+  } finally { btn.disabled = false; }
+}
+
+async function sendToPrinter(data){
+  const chunk = 180;   // écriture par petits blocs (BLE)
+  for (let i = 0; i < data.length; i += chunk) {
+    const part = data.slice(i, i + chunk);
+    if (btChar.properties.writeWithoutResponse && btChar.writeValueWithoutResponse) await btChar.writeValueWithoutResponse(part);
+    else await btChar.writeValue(part);
+    await new Promise(r => setTimeout(r, 20));
+  }
+}
+
+// Construit le ticket au format ESC/POS (même contenu que l'aperçu écran)
+function buildEscPos(snap){
+  const bytes = [];
+  const raw = (...b) => b.forEach(x => bytes.push(x));
+  const txt = (s) => { const t = stripAccents(String(s)); for (let i = 0; i < t.length; i++) bytes.push(t.charCodeAt(i) & 0xFF); };
+  const ln  = (s = '') => { txt(s); bytes.push(0x0A); };
+  const money = n => n.toFixed(2).replace('.', ',') + ' EUR';
+  const sep = '-'.repeat(PRINT_W);
+  const lr = (l, r) => { l = stripAccents(l); r = stripAccents(r); const sp = Math.max(1, PRINT_W - l.length - r.length); return l + ' '.repeat(sp) + r; };
+
+  raw(0x1B, 0x40);                              // init
+  raw(0x1B, 0x61, 0x01);                        // centré
+  raw(0x1D, 0x21, 0x11); raw(0x1B, 0x45, 0x01); // double taille + gras
+  ln(settings.shopName || 'Restaurant');
+  raw(0x1D, 0x21, 0x00); raw(0x1B, 0x45, 0x00);
+  if (settings.shopAddr)  ln(settings.shopAddr);
+  if (settings.shopPhone) ln(settings.shopPhone);
+  raw(0x1B, 0x61, 0x00);                        // aligné à gauche
+  ln(sep);
+  raw(0x1B, 0x45, 0x01); ln('Commande N' + snap.num + '    ' + snap.type); raw(0x1B, 0x45, 0x00);
+  ln(snap.date);
+  ln(sep);
+  snap.lines.forEach(l => {
+    raw(0x1B, 0x45, 0x01);
+    ln(lr(l.qty + ' x ' + (l.title || l.name || ''), money((l.base != null ? l.base : l.unit || 0) * l.qty)));
+    raw(0x1B, 0x45, 0x00);
+    (l.sections || []).forEach(sec => {
+      ln('  ' + sec.title);
+      sec.rows.forEach(r => ln(lr('    ' + r.label, r.price ? money(r.price) : '')));
+    });
+  });
+  ln(sep);
+  ln(lr('Sous-total', money(snap.subtotal)));
+  if (snap.fee) ln(lr('Frais de livraison', money(snap.fee)));
+  raw(0x1B, 0x45, 0x01); raw(0x1D, 0x21, 0x01);
+  ln(lr('TOTAL', money(snap.total)));
+  raw(0x1D, 0x21, 0x00); raw(0x1B, 0x45, 0x00);
+  if (snap.delivery) {
+    ln(sep);
+    ln('Tel : ' + (snap.delivery.phone || ''));
+    ln('Adr : ' + (snap.delivery.address || ''));
+    const pay = snap.delivery.payment;
+    if (pay) {
+      ln('Paiement : ' + pay.method);
+      if (pay.method === 'Espèces' && pay.received != null)
+        ln(lr('Recu ' + money(pay.received), 'Rendu ' + money(Math.max(0, pay.received - snap.total))));
+    }
+  }
+  const prep = settings.prepMinutes != null ? settings.prepMinutes : 15;
+  if (snap.ts) { ln(sep); ln('A preparer pour ' + new Date(snap.ts + prep * 60000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
+  raw(0x1B, 0x61, 0x01);                        // centré
+  ln(''); ln('Merci et a bientot !');
+  raw(0x0A, 0x0A, 0x0A, 0x0A);                  // avance papier
+  raw(0x1D, 0x56, 0x00);                        // coupe
+  return new Uint8Array(bytes);
+}
+
+async function printReceipt(snap){
   if (!snap) return;
-  document.getElementById('print-area').innerHTML = buildReceiptHTML(snap);
-  window.print();
+  if (btChar) {
+    try { await sendToPrinter(buildEscPos(snap)); showToast('✓ Ticket imprimé'); }
+    catch (e) { btChar = null; setPrinterStatus('Imprimante déconnectée', false); showToast("Impossible d'imprimer (imprimante injoignable)"); }
+    return;
+  }
+  showToast("Impossible d'imprimer — connectez l'imprimante dans Paramètres");
 }
 
 // Ingrédients (viandes) fixes contenus dans un produit — déduit du nom/description
@@ -1735,6 +1858,7 @@ document.getElementById('set-save').addEventListener('click', () => {
   saveSettings();
   showToast('✓ Paramètres enregistrés');
 });
+document.getElementById('btn-connect-printer').addEventListener('click', connectPrinter);
 document.getElementById('set-test-print').addEventListener('click', () => {
   readSettingsFields();   // utilise les valeurs saisies pour l'aperçu
   const now = Date.now();
