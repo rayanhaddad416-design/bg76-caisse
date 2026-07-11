@@ -1726,7 +1726,7 @@ function groupLines(lines){
   return groups;
 }
 
-function rcRow(q, label, unitPrice){ return { label: q + 'x ' + label, price: unitPrice * q }; }
+function rcRow(q, label, unitPrice){ return { label: label, price: unitPrice * q }; }
 
 // Détaille un article en sections (PAIN / SAUCE / CRUDITÉS / EXTRAS...) comme sur le ticket
 function buildSections(a, q){
