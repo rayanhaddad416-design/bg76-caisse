@@ -612,6 +612,13 @@
           <label>Temps de préparation (minutes)
             <input type="number" id="set-prep" min="0" step="1" placeholder="15">
           </label>
+          <label>Taille du texte imprimé
+            <select id="set-printscale">
+              <option value="1">Normale</option>
+              <option value="2">Grande</option>
+              <option value="3">Très grande</option>
+            </select>
+          </label>
           <button type="button" class="btn btn-outline" id="set-test-print">🖨️ Imprimer un ticket de test</button>
         </div>
 
@@ -820,7 +827,7 @@ function escapeHtml(s){
 
 // ===================== PARAMETRES (persistant) =====================
 const SETTINGS_KEY = 'bg76_settings';
-const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15, useRawbt: false, dayResetHour: 0 };
+const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15, useRawbt: false, dayResetHour: 0, printScale: 2 };
 let settings = loadSettings();
 let lastSnap = null;   // dernière commande finie (pour réimprimer)
 
@@ -913,14 +920,26 @@ function buildEscPos(snap){
   const txt = (s) => { const t = stripAccents(String(s)); for (let i = 0; i < t.length; i++) bytes.push(t.charCodeAt(i) & 0xFF); };
   const ln  = (s = '') => { txt(s); bytes.push(0x0A); };
   const money = n => n.toFixed(2).replace('.', ',') + ' EUR';
-  const sep = '-'.repeat(PRINT_W);
-  const lr = (l, r) => { l = stripAccents(l); r = stripAccents(r); const sp = Math.max(1, PRINT_W - l.length - r.length); return l + ' '.repeat(sp) + r; };
+
+  // Taille du texte réglable (settings.printScale : 1 Normale, 2 Grande, 3 Très grande)
+  const scale = Math.max(1, Math.min(3, settings.printScale || 2));
+  const W = Math.min(scale, 2);                 // largeur (x1 ou x2 max, sinon ça déborde)
+  const H = scale;                              // hauteur (x1 à x3)
+  const PW = Math.floor(PRINT_W / W);           // colonnes utiles à cette taille
+  const sizeByte = (w, h) => ((Math.min(w, 8) - 1) << 4) | (Math.min(h, 8) - 1);
+  const setSize = (w, h) => raw(0x1D, 0x21, sizeByte(w, h));
+  const setBody  = () => setSize(W, H);         // taille de base du corps
+  const setTitle = () => setSize(2, Math.min(H + 1, 4));   // en-tête boutique, plus gros
+  const setTotal = () => setSize(W, Math.min(H + 1, 4));   // ligne TOTAL, plus haute
+  const sep = '-'.repeat(PW);
+  const lr = (l, r) => { l = stripAccents(l); r = stripAccents(r); const sp = Math.max(1, PW - l.length - r.length); return l + ' '.repeat(sp) + r; };
 
   raw(0x1B, 0x40);                              // init
+  setBody();                                    // tout le ticket à la taille choisie
   raw(0x1B, 0x61, 0x01);                        // centré
-  raw(0x1D, 0x21, 0x11); raw(0x1B, 0x45, 0x01); // double taille + gras
+  setTitle(); raw(0x1B, 0x45, 0x01);            // nom boutique : plus gros + gras
   ln(settings.shopName || 'Restaurant');
-  raw(0x1D, 0x21, 0x00); raw(0x1B, 0x45, 0x00);
+  setBody(); raw(0x1B, 0x45, 0x00);
   if (settings.shopAddr)  ln(settings.shopAddr);
   if (settings.shopPhone) ln(settings.shopPhone);
   raw(0x1B, 0x61, 0x00);                        // aligné à gauche
@@ -941,9 +960,9 @@ function buildEscPos(snap){
   ln(sep);
   ln(lr('Sous-total', money(snap.subtotal)));
   if (snap.fee) ln(lr('Frais de livraison', money(snap.fee)));
-  raw(0x1B, 0x45, 0x01); raw(0x1D, 0x21, 0x01);
+  raw(0x1B, 0x45, 0x01); setTotal();
   ln(lr('TOTAL', money(snap.total)));
-  raw(0x1D, 0x21, 0x00); raw(0x1B, 0x45, 0x00);
+  setBody(); raw(0x1B, 0x45, 0x00);
   if (snap.payMethod) ln('Paiement : ' + snap.payMethod);
   if (snap.delivery) {
     ln(sep);
@@ -1936,6 +1955,7 @@ function fillSettingsFields(){
   document.getElementById('set-phone').value = settings.shopPhone || '';
   document.getElementById('set-prep').value = settings.prepMinutes != null ? settings.prepMinutes : 15;
   document.getElementById('set-dayhour').value = settings.dayResetHour != null ? settings.dayResetHour : 0;
+  document.getElementById('set-printscale').value = String(settings.printScale != null ? settings.printScale : 2);
 }
 function openSettings(){
   fillSettingsFields();
@@ -1993,6 +2013,8 @@ function readSettingsFields(){
   settings.prepMinutes = (!isNaN(p) && p >= 0) ? p : 15;
   const dh = parseInt(document.getElementById('set-dayhour').value, 10);
   settings.dayResetHour = (!isNaN(dh) && dh >= 0 && dh <= 23) ? dh : 0;
+  const ps = parseInt(document.getElementById('set-printscale').value, 10);
+  settings.printScale = (!isNaN(ps) && ps >= 1 && ps <= 3) ? ps : 2;
 }
 document.getElementById('set-save').addEventListener('click', () => {
   settings.autoPrint = document.getElementById('set-autoprint').checked;
