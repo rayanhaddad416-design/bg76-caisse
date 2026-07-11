@@ -62,7 +62,7 @@
     background: #ffffff;
     width: 100%;
     max-width: 1100px;
-    height: 640px;
+    height: min(800px, calc(100vh - 44px));   /* remplit l'écran sans déborder (tablette paysage) */
     border-radius: 6px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.08);
     padding: 40px 50px 30px;
@@ -92,6 +92,7 @@
     justify-content: center;
     gap: 45px;
     flex-wrap: wrap;
+    padding-bottom: 12vh;   /* remonte un peu les boutons (tablette paysage) */
   }
   .opt {
     border: 2.5px solid #000;
@@ -200,6 +201,17 @@
   .confirm-note { text-align: center; font-weight: 700; margin-top: 10px; min-height: 20px; font-size: 15px; }
   .confirm-note.warn { color: #c0392b; }
   .confirm-note.ok { color: #0f7a37; }
+
+  /* Articles de la commande (écran confirmation) avec + / − */
+  .cfm-item { padding: 12px 4px; border-bottom: 1px solid #e2e2e2; }
+  .cfm-top { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; font-size: 17px; }
+  .cfm-detail { font-size: 13.5px; color: #666; margin: 4px 0 8px; }
+  .cfm-actions { display: flex; align-items: center; gap: 12px; }
+  .cfm-btn { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #0637c8; background: #fff; color: #0637c8; font-size: 24px; font-weight: 800; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .cfm-btn:hover { background: #0637c8; color: #fff; }
+  .cfm-qty { min-width: 30px; text-align: center; font-size: 20px; font-weight: 800; }
+  .cfm-del { margin-left: auto; background: transparent; border: none; font-size: 22px; cursor: pointer; opacity: 0.7; }
+  .cfm-del:hover { opacity: 1; }
 
   /* Formulaire de livraison */
   .delivery-form { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; width: 100%; max-width: 520px; margin: 4px auto 0; }
@@ -403,14 +415,14 @@
       <path d="M0,255 V205 C28,207 32,245 70,240 C100,236 90,268 60,266 Z" fill="#6ea8ff" opacity="0.5"/>
     </svg>
     <div class="step-title">Type de commande</div>
-    <div class="step-sub">Choisissez une option puis cliquez sur Suivant</div>
+    <div class="step-sub">Touchez une option pour continuer</div>
     <div class="options" id="opts-type">
       <div class="opt" data-value="Sur place">Sur place</div>
       <div class="opt" data-value="Emporter">Emporter</div>
       <div class="opt" data-value="Livraison">Livraison</div>
     </div>
     <div class="bottom-bar">
-      <button class="btn btn-blue" id="next-type" disabled>Suivant</button>
+      <button class="btn btn-blue" id="next-type" disabled style="display:none">Suivant</button>
     </div>
   </div>
 
@@ -422,7 +434,7 @@
     <div class="bottom-bar">
       <button class="btn btn-back" id="product-back">← Retour</button>
       <div class="spacer"></div>
-      <button class="btn btn-blue" id="product-next" disabled>Suivant</button>
+      <button class="btn btn-blue" id="product-next" disabled style="display:none">Suivant</button>
     </div>
   </div>
 
@@ -438,16 +450,15 @@
     </div>
   </div>
 
-  <!-- ECRAN 4 : Confirmation de l'article -->
+  <!-- ECRAN 4 : Confirmation de la commande -->
   <div class="screen hidden" id="screen-confirm">
-    <div class="step-title">Votre article</div>
-    <div class="step-sub">Ajoutez-le puis composez-en un autre, ou terminez la commande</div>
-    <div class="confirm-wrap"><div class="recap" id="confirm-recap"></div></div>
+    <div class="step-title">Votre commande</div>
+    <div class="step-sub">Ajustez les quantités avec + / −, ajoutez d'autres articles, puis Finis</div>
+    <div class="scroll-wrap"><div id="confirm-recap"></div></div>
     <div class="confirm-note" id="confirm-note"></div>
     <div class="bottom-bar">
-      <button class="btn btn-back" id="confirm-back">← Retour</button>
+      <button class="btn btn-outline" id="btn-ajouter">+ Ajouter un article</button>
       <div class="spacer"></div>
-      <button class="btn btn-outline" id="btn-ajouter">+ Ajouter un autre</button>
       <button class="btn btn-blue" id="btn-finis">Finis !</button>
     </div>
   </div>
@@ -1349,43 +1360,71 @@ document.getElementById('step-back').addEventListener('click', () => {
 // ===================== CONFIRMATION =====================
 function orderTotal(){ let t = 0; order.lines.forEach(a => t += unitPrice(a)); return t; }
 
-function showConfirm(){
-  const a = art;
-  const u = unitPrice(a);
-  let html = '<ul><li><div class="line-top"><span><strong>' + articleName(a) + '</strong></span>'
-           + '<span class="line-price">' + euro(u) + '</span></div>';
-  const d = details(a);
-  if (d) html += '<div class="line-detail">' + d + '</div>';
-  html += '</li></ul>';
-  document.getElementById('confirm-recap').innerHTML = html;
+function cloneArt(a){
+  return { item: a.item, size: a.size, cuisson: a.cuisson, pain: a.pain,
+           viandes: a.viandes.slice(), sauces: a.sauces.slice(), crudites: a.crudites.slice(), extras: a.extras.slice() };
+}
 
-  // Minimum de commande pour la livraison
-  const finis = document.getElementById('btn-finis');
-  const note = document.getElementById('confirm-note');
-  const projet = orderTotal() + u;   // total si on valide cet article
-  if (order.type === 'Livraison' && projet < DELIVERY_MIN) {
-    finis.disabled = true;
-    note.className = 'confirm-note warn';
-    note.textContent = 'Livraison : minimum ' + euro(DELIVERY_MIN) + ' — il manque ' + euro(DELIVERY_MIN - projet) + '. Ajoutez des articles.';
-  } else {
-    finis.disabled = false;
-    note.className = 'confirm-note ok';
-    note.textContent = order.type === 'Livraison' ? 'Minimum livraison atteint ✓  (total ' + euro(projet) + ')' : '';
-  }
+function showConfirm(){
+  if (art) { order.lines.push(cloneArt(art)); art = null; }   // l'article composé rejoint la commande
+  updateCart();
+  renderConfirmList();
   showScreen('screen-confirm');
 }
 
-document.getElementById('confirm-back').addEventListener('click', () => {
-  if (flow.length) { stepIndex = flow.length - 1; renderStep(); showScreen('screen-step'); }
-  else showScreen('screen-product');
-});
+// Liste des articles avec + / − / supprimer
+function renderConfirmList(){
+  const wrap = document.getElementById('confirm-recap');
+  const groups = groupLines(order.lines);
+  let html = '';
+  groups.forEach((g, gi) => {
+    const u = unitPrice(g.art);
+    html += '<div class="cfm-item">'
+      + '<div class="cfm-top"><span class="cfm-name">' + escapeHtml(articleName(g.art)) + '</span>'
+      + '<span class="cfm-price">' + euro(u * g.qty) + '</span></div>';
+    const d = details(g.art);
+    if (d) html += '<div class="cfm-detail">' + d + '</div>';
+    html += '<div class="cfm-actions">'
+      + '<button class="cfm-btn" data-act="minus" data-g="' + gi + '">−</button>'
+      + '<span class="cfm-qty">' + g.qty + '</span>'
+      + '<button class="cfm-btn" data-act="plus" data-g="' + gi + '">+</button>'
+      + '<button class="cfm-del" data-act="del" data-g="' + gi + '">🗑</button></div></div>';
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = groupLines(order.lines)[parseInt(btn.dataset.g, 10)];
+      if (!g) return;
+      const act = btn.dataset.act;
+      if (act === 'plus') order.lines.push(cloneArt(g.art));
+      else if (act === 'minus') { const i = order.lines.findIndex(a => groupKey(a) === g.key); if (i >= 0) order.lines.splice(i, 1); }
+      else if (act === 'del') order.lines = order.lines.filter(a => groupKey(a) !== g.key);
+      updateCart();
+      renderConfirmList();
+    });
+  });
+  updateConfirmNote();
+}
 
-function finalize(){ order.lines.push(art); updateCart(); }
+function updateConfirmNote(){
+  const finis = document.getElementById('btn-finis');
+  const note = document.getElementById('confirm-note');
+  const total = orderTotal();
+  if (!order.lines.length) {
+    finis.disabled = true; note.className = 'confirm-note warn';
+    note.textContent = 'Ajoutez au moins un article.'; return;
+  }
+  if (order.type === 'Livraison' && total < DELIVERY_MIN) {
+    finis.disabled = true; note.className = 'confirm-note warn';
+    note.textContent = 'Livraison : minimum ' + euro(DELIVERY_MIN) + ' — il manque ' + euro(DELIVERY_MIN - total) + '.';
+  } else {
+    finis.disabled = false; note.className = 'confirm-note ok';
+    note.textContent = order.type === 'Livraison' ? 'Minimum livraison atteint ✓  (' + euro(total) + ')' : '';
+  }
+}
 
 document.getElementById('btn-ajouter').addEventListener('click', () => {
-  finalize();
   selectedProductId = null;
-  document.getElementById('product-next').disabled = true;
   document.querySelectorAll('#product-list .opt').forEach(o => o.classList.remove('selected'));
   showScreen('screen-product');
 });
@@ -1409,7 +1448,6 @@ document.querySelectorAll('#screen-pay .pay-choice').forEach(btn => {
   btn.addEventListener('click', () => {
     order.comment = document.getElementById('order-comment').value.trim();
     order.payment = { method: btn.dataset.method };
-    finalize();
     completeOrder();
   });
 });
@@ -1674,7 +1712,6 @@ document.getElementById('deliv-done').addEventListener('click', () => {
     payment
   };
   order.comment = document.getElementById('deliv-comment').value.trim();
-  finalize();
   completeOrder();
 });
 
