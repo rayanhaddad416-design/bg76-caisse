@@ -950,14 +950,14 @@ function buildEscPos(snap){
   ln(snap.date);
   ln(sep);
   snap.lines.forEach((l, idx) => {
-    if (idx > 0) { ln(''); ln(''); }              // grand espace entre chaque article
+    if (idx > 0) ln('');                          // espace entre chaque article
     raw(0x1B, 0x45, 0x01);
     ln(lr(l.qty + ' x ' + (l.title || l.name || ''), money((l.base != null ? l.base : l.unit || 0) * l.qty)));
     raw(0x1B, 0x45, 0x00);
     (l.sections || []).forEach(sec => {
       ln('');                                     // air avant chaque rubrique
       ln('  ' + sec.title);
-      sec.rows.forEach(r => { ln(''); ln(lr('    ' + r.label, r.price ? money(r.price) : '')); });
+      sec.rows.forEach(r => ln(lr('    ' + r.label, r.price ? money(r.price) : '')));
     });
   });
   if (snap.comment) { ln(sep); raw(0x1B, 0x45, 0x01); ln('NOTE :'); raw(0x1B, 0x45, 0x00); ln(snap.comment); }
