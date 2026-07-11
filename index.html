@@ -525,9 +525,11 @@
         <button type="button" class="cat-header set-acc"><span class="chevron">▸</span><span>🖨️ Impression</span></button>
         <div class="set-sec hidden">
           <div class="printer-box">
-            <div class="printer-status" id="printer-status">🔴 Aucune imprimante connectée</div>
-            <button type="button" class="btn btn-blue" id="btn-connect-printer">🖨️ Connecter l'imprimante Bluetooth</button>
-            <div class="printer-hint">Impression directe pour une imprimante Bluetooth <b>BLE</b> (Android). Les imprimantes réseau ou Bluetooth « classique » (ex. Epson TM-m30II) passent par la fenêtre d'impression Android.</div>
+            <label class="switch-row">
+              <span>Impression directe via RawBT (imprimante thermique Bluetooth)</span>
+              <input type="checkbox" id="set-rawbt">
+            </label>
+            <div class="printer-hint">Pour la TM-m30II : installe l'app gratuite <b>RawBT</b> (Play Store), connecte-la à l'imprimante en Bluetooth, puis active cette option. Le ticket sort direct, sans fenêtre. (Android uniquement.)</div>
           </div>
           <label class="switch-row">
             <span>Imprimer automatiquement chaque commande finie</span>
@@ -741,7 +743,7 @@ function escapeHtml(s){
 
 // ===================== PARAMETRES (persistant) =====================
 const SETTINGS_KEY = 'bg76_settings';
-const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15 };
+const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15, useRawbt: false };
 let settings = loadSettings();
 let lastSnap = null;   // dernière commande finie (pour réimprimer)
 
@@ -884,14 +886,28 @@ function buildEscPos(snap){
   return new Uint8Array(bytes);
 }
 
+// Envoie le ticket ESC/POS à l'app RawBT (qui parle en Bluetooth à la TM-m30II)
+function printViaRawBT(snap){
+  const bytes = buildEscPos(snap);
+  let bin = '';
+  const CH = 8192;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  const b64 = btoa(bin);
+  const a = document.createElement('a');
+  a.href = 'rawbt:base64,' + b64;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
 async function printReceipt(snap){
   if (!snap) return;
-  // 1) Si une imprimante Bluetooth BLE est connectée -> impression directe silencieuse
+  // 1) RawBT activé -> impression directe silencieuse (Bluetooth via l'app RawBT)
+  if (settings.useRawbt) { printViaRawBT(snap); return; }
+  // 2) Imprimante Bluetooth BLE connectée -> impression directe
   if (btChar) {
     try { await sendToPrinter(buildEscPos(snap)); showToast('✓ Ticket imprimé'); return; }
     catch (e) { btChar = null; setPrinterStatus('Imprimante déconnectée', false); }
   }
-  // 2) Sinon -> fenêtre d'impression Android (imprimante réseau / Bluetooth classique comme la TM-m30II)
+  // 3) Sinon -> fenêtre d'impression Android
   document.getElementById('print-area').innerHTML = buildReceiptHTML(snap);
   window.print();
 }
@@ -1794,6 +1810,7 @@ document.getElementById('nav-settings').addEventListener('click', () => { openSe
 // ===================== ECRAN PARAMETRES =====================
 function fillSettingsFields(){
   document.getElementById('set-autoprint').checked = !!settings.autoPrint;
+  document.getElementById('set-rawbt').checked = !!settings.useRawbt;
   document.getElementById('set-name').value = settings.shopName || '';
   document.getElementById('set-addr').value = settings.shopAddr || '';
   document.getElementById('set-phone').value = settings.shopPhone || '';
@@ -1856,11 +1873,11 @@ function readSettingsFields(){
 }
 document.getElementById('set-save').addEventListener('click', () => {
   settings.autoPrint = document.getElementById('set-autoprint').checked;
+  settings.useRawbt = document.getElementById('set-rawbt').checked;
   readSettingsFields();
   saveSettings();
   showToast('✓ Paramètres enregistrés');
 });
-document.getElementById('btn-connect-printer').addEventListener('click', connectPrinter);
 document.getElementById('set-test-print').addEventListener('click', () => {
   readSettingsFields();   // utilise les valeurs saisies pour l'aperçu
   const now = Date.now();
