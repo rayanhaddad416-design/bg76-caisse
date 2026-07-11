@@ -658,12 +658,12 @@ const VIANDES  = ["Kebab Maison", "Poulet", "Merguez", "Steak", "Tenders", "Nugg
 const CUISSONS = ["Bleu", "Saignant", "À point", "Bien cuit"];
 const SAUCES   = ["Samouraï","Algérienne","Blanche","Biggy","Curry","Harissa","Andalouse","Barbecue","Mayonnaise","Ketchup","Poivre"];
 const CRUDITES = ["Salade", "Tomate", "Oignons"];
-const EXTRAS   = ["Cheddar fondu","Cheddar","Gouda","Boursin","Bacon","Avocat","Œuf"];
+const EXTRAS   = ["Cheddar fondu","Cheddar","Gouda","Boursin","Bacon","Avocat","Œuf","Cannette"];
 
 // Prix des extras (à confirmer — voir remarque)
 const EXTRA_PRICES = {
   "Cheddar fondu": 1.00, "Cheddar": 0.50, "Gouda": 0.50,
-  "Boursin": 1.00, "Bacon": 1.00, "Avocat": 1.00, "Œuf": 1.00
+  "Boursin": 1.00, "Bacon": 1.00, "Avocat": 1.00, "Œuf": 1.00, "Cannette": 1.50
 };
 
 // flow : pain / cuisson / sauce / crudites / extras (booléens) ; viandes = nombre de viandes à choisir
@@ -999,8 +999,8 @@ function buildReceiptCanvas(snap){
   snap.lines.forEach((l, idx) => {
     pair(l.qty + ' x ' + (l.title || l.name || ''), money((l.base != null ? l.base : l.unit || 0) * l.qty), 'bold 33px sans-serif', idx > 0 ? 20 : 0);
     (l.sections || []).forEach(sec => {
-      add('  ' + sec.title, 'bold 26px sans-serif', 'left', 10);
-      sec.rows.forEach(r => pair('    ' + r.label, r.price ? money(r.price) : '', '26px sans-serif'));
+      add('  ' + sec.title, 'bold 28px sans-serif', 'left', 10);
+      sec.rows.forEach(r => pair('    ' + r.label, r.price ? money(r.price) : '', '30px sans-serif'));
     });
   });
   if (snap.comment) { rule(8); add('NOTE : ' + snap.comment, 'bold 26px sans-serif', 'left'); }
