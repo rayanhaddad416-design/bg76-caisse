@@ -282,6 +282,29 @@
   .rc-tot.grand span:last-child { color: #0637c8; }
   .rc-meta { color: #555; font-size: 13.5px; margin-top: 10px; line-height: 1.6; }
   .rc-foot { text-align: center; font-weight: 700; margin-top: 14px; }
+  .rc-comment { margin: 10px 0; padding: 10px 14px; background: #fff8e1; border: 1px solid #ffe08a; border-radius: 8px; font-weight: 700; }
+
+  /* Onglets du récap */
+  .recap-tabs { display: flex; gap: 10px; margin: 0 0 12px; }
+  .rtab { flex: 1; border: 2px solid #e2e6f0; background: #f4f5f7; border-radius: 10px; padding: 12px; font-size: 16px; font-weight: 700; color: #333; cursor: pointer; }
+  .rtab.active { background: #0637c8; border-color: #0637c8; color: #fff; }
+  .order-header { margin-left: 10px; }
+
+  /* Ecran paiement (sur place / emporter) */
+  .pay-big { display: flex; gap: 18px; justify-content: center; margin: 10px 0 18px; }
+  .pay-choice { flex: 1; max-width: 240px; border: 2.5px solid #000; background: #fff; border-radius: 14px; padding: 28px 10px; font-size: 22px; font-weight: 800; line-height: 1.4; cursor: pointer; transition: all 0.12s ease; }
+  .pay-choice:hover { background: #0637c8; border-color: #0637c8; color: #fff; }
+  .comment-lbl { display: flex; flex-direction: column; gap: 8px; font-weight: 700; font-size: 15px; max-width: 560px; margin: 0 auto; width: 100%; }
+  .comment-lbl textarea { font-size: 16px; padding: 12px; border: 2px solid #cfd6e6; border-radius: 10px; font-family: inherit; min-height: 70px; resize: vertical; }
+
+  /* Modale code */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal-box { background: #fff; border-radius: 14px; padding: 24px; width: 100%; max-width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+  .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+  .modal-msg { color: #555; font-size: 14px; margin-bottom: 14px; }
+  .modal-msg.err { color: #c0392b; font-weight: 700; }
+  .modal-box input { width: 100%; font-size: 22px; text-align: center; letter-spacing: 6px; padding: 12px; border: 2px solid #cfd6e6; border-radius: 10px; margin-bottom: 16px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
   /* Toast de confirmation */
   .toast {
@@ -442,6 +465,36 @@
     </div>
   </div>
 
+  <!-- ECRAN PAIEMENT (sur place / emporter) -->
+  <div class="screen hidden" id="screen-pay">
+    <div class="step-title">Paiement</div>
+    <div class="step-sub">Comment le client paie ?</div>
+    <div class="pay-big">
+      <button type="button" class="pay-choice" data-method="Espèces">💶<br>Espèces</button>
+      <button type="button" class="pay-choice" data-method="CB">💳<br>CB</button>
+    </div>
+    <label class="comment-lbl">📝 Commentaire (facultatif) — s'imprime sur le ticket
+      <textarea id="order-comment" placeholder="Ex : sans oignon, bien cuit…"></textarea>
+    </label>
+    <div class="bottom-bar">
+      <button class="btn btn-back" id="pay-back">← Retour</button>
+      <div class="spacer"></div>
+    </div>
+  </div>
+
+  <!-- MODALE CODE (suppression récap caisse) -->
+  <div class="modal-overlay hidden" id="code-modal">
+    <div class="modal-box">
+      <div class="modal-title">Code requis</div>
+      <div class="modal-msg" id="code-msg">Entrez le code pour vider ce récap</div>
+      <input type="password" inputmode="numeric" id="code-input" placeholder="••••">
+      <div class="modal-actions">
+        <button class="btn btn-back" id="code-cancel">Annuler</button>
+        <button class="btn btn-blue" id="code-ok">Valider</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ECRAN STOCK -->
   <div class="screen hidden" id="screen-stock">
     <div class="step-title">Gestion du stock</div>
@@ -489,6 +542,9 @@
           <div class="pay-change" id="pay-change"></div>
         </div>
       </div>
+      <label class="comment-lbl">📝 Commentaire (facultatif) — s'imprime sur le ticket
+        <textarea id="deliv-comment" placeholder="Ex : sonner à l'interphone, 3e étage…"></textarea>
+      </label>
     </div>
     <div class="bottom-bar">
       <button class="btn btn-back" id="deliv-back">← Retour</button>
@@ -510,9 +566,16 @@
 
   <!-- ECRAN RECAP DES VENTES -->
   <div class="screen hidden" id="screen-recap">
-    <div class="step-title">Récap des ventes</div>
-    <div class="step-sub" id="recap-sub"></div>
+    <div class="step-title">Récap</div>
+    <div class="recap-tabs">
+      <button type="button" class="rtab active" data-tab="ventes">📊 Ventes</button>
+      <button type="button" class="rtab" data-tab="caisse">💶 Caisse</button>
+    </div>
     <div class="scroll-wrap" id="recap-list"></div>
+    <div class="bottom-bar">
+      <div class="spacer"></div>
+      <button class="btn btn-outline" id="recap-clear">Vider ce récap</button>
+    </div>
   </div>
 
   <!-- ECRAN PARAMETRES -->
@@ -551,6 +614,9 @@
           </label>
           <label>Téléphone (sur le ticket)
             <input type="text" id="set-phone" placeholder="02 xx xx xx xx">
+          </label>
+          <label>Heure de changement de jour (récap &amp; historique, 0–23)
+            <input type="number" id="set-dayhour" min="0" max="23" step="1" placeholder="0">
           </label>
         </div>
 
@@ -654,7 +720,7 @@ const MENU = [
 
 // ===================== ETAT =====================
 const DELIVERY_MIN = 20;   // minimum pour la livraison (€)
-let order = { type: null, lines: [], delivery: null };
+let order = { type: null, lines: [], delivery: null, payment: null, comment: '' };
 let art = null;            // article en cours
 let flow = [];             // liste des étapes de l'article
 let stepIndex = 0;
@@ -743,7 +809,7 @@ function escapeHtml(s){
 
 // ===================== PARAMETRES (persistant) =====================
 const SETTINGS_KEY = 'bg76_settings';
-const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15, useRawbt: false };
+const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15, useRawbt: false, dayResetHour: 0 };
 let settings = loadSettings();
 let lastSnap = null;   // dernière commande finie (pour réimprimer)
 
@@ -860,22 +926,21 @@ function buildEscPos(snap){
       sec.rows.forEach(r => ln(lr('    ' + r.label, r.price ? money(r.price) : '')));
     });
   });
+  if (snap.comment) { ln(sep); raw(0x1B, 0x45, 0x01); ln('NOTE :'); raw(0x1B, 0x45, 0x00); ln(snap.comment); }
   ln(sep);
   ln(lr('Sous-total', money(snap.subtotal)));
   if (snap.fee) ln(lr('Frais de livraison', money(snap.fee)));
   raw(0x1B, 0x45, 0x01); raw(0x1D, 0x21, 0x01);
   ln(lr('TOTAL', money(snap.total)));
   raw(0x1D, 0x21, 0x00); raw(0x1B, 0x45, 0x00);
+  if (snap.payMethod) ln('Paiement : ' + snap.payMethod);
   if (snap.delivery) {
     ln(sep);
     ln('Tel : ' + (snap.delivery.phone || ''));
     ln('Adr : ' + (snap.delivery.address || ''));
     const pay = snap.delivery.payment;
-    if (pay) {
-      ln('Paiement : ' + pay.method);
-      if (pay.method === 'Espèces' && pay.received != null)
-        ln(lr('Recu ' + money(pay.received), 'Rendu ' + money(Math.max(0, pay.received - snap.total))));
-    }
+    if (pay && pay.method === 'Espèces' && pay.received != null)
+      ln(lr('Recu ' + money(pay.received), 'Rendu ' + money(Math.max(0, pay.received - snap.total))));
   }
   const prep = settings.prepMinutes != null ? settings.prepMinutes : 15;
   if (snap.ts) { ln(sep); ln('A preparer pour ' + new Date(snap.ts + prep * 60000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })); }
@@ -1050,13 +1115,12 @@ function updateCart(){
 // ===================== ECRAN TYPE =====================
 document.querySelectorAll('#opts-type .opt').forEach(opt => {
   opt.addEventListener('click', () => {
-    document.querySelectorAll('#opts-type .opt').forEach(o => o.classList.remove('selected'));
-    opt.classList.add('selected');
     order.type = opt.dataset.value;
-    document.getElementById('next-type').disabled = false;
+    updateCart();
+    showScreen('screen-product');   // on avance directement, pas besoin de "Suivant"
   });
 });
-document.getElementById('next-type').addEventListener('click', () => { updateCart(); showScreen('screen-product'); });
+document.getElementById('next-type').addEventListener('click', () => { if (order.type) { updateCart(); showScreen('screen-product'); } });
 
 // ===================== ECRAN PRODUIT =====================
 function buildProductList(){
@@ -1083,12 +1147,7 @@ function buildProductList(){
         + (available ? '<div class="price-badge">' + priceHint + '</div>'
                      : '<div class="out-badge">Plus en stock</div>');
       if (available) {
-        el.addEventListener('click', () => {
-          selectedProductId = item.id;
-          wrap.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
-          el.classList.add('selected');
-          document.getElementById('product-next').disabled = false;
-        });
+        el.addEventListener('click', () => { selectedProductId = item.id; startArticle(item); });   // on avance directement
       }
       grid.appendChild(el);
     });
@@ -1200,7 +1259,11 @@ function renderStep(){
     el.innerHTML = v
       + (badges && badges[v] != null ? '<div class="price-badge">' + badges[v] + '</div>' : '')
       + (isOut ? '<div class="out-badge">Plus en stock</div>' : '');
-    if (!isOut) el.addEventListener('click', () => { onToggle(key, v); refresh(); });
+    if (!isOut) el.addEventListener('click', () => {
+      onToggle(key, v);
+      refresh();
+      if (key === 'size' || key === 'cuisson' || key === 'pain') stepAdvance();   // choix unique -> on avance
+    });
     grid.appendChild(el);
   });
   refresh();
@@ -1273,10 +1336,11 @@ function renderSauceStep(){
 }
 
 // Navigation dans les étapes
-document.getElementById('step-next').addEventListener('click', () => {
+function stepAdvance(){
   if (stepIndex < flow.length - 1) { stepIndex++; renderStep(); }
   else showConfirm();
-});
+}
+document.getElementById('step-next').addEventListener('click', stepAdvance);
 document.getElementById('step-back').addEventListener('click', () => {
   if (stepIndex > 0) { stepIndex--; renderStep(); }
   else showScreen('screen-product');
@@ -1329,12 +1393,25 @@ document.getElementById('btn-ajouter').addEventListener('click', () => {
 document.getElementById('btn-finis').addEventListener('click', () => {
   if (document.getElementById('btn-finis').disabled) return;
   if (order.type === 'Livraison') {
-    // On demande d'abord téléphone + adresse (l'article sera validé à "Terminer")
-    showDelivery();
+    showDelivery();              // téléphone + adresse + paiement
   } else {
+    showPayScreen();            // sur place / emporter : juste Espèces ou CB + commentaire
+  }
+});
+
+// ----- Ecran paiement (sur place / emporter) -----
+function showPayScreen(){
+  document.getElementById('order-comment').value = order.comment || '';
+  showScreen('screen-pay');
+}
+document.getElementById('pay-back').addEventListener('click', () => showConfirm());
+document.querySelectorAll('#screen-pay .pay-choice').forEach(btn => {
+  btn.addEventListener('click', () => {
+    order.comment = document.getElementById('order-comment').value.trim();
+    order.payment = { method: btn.dataset.method };
     finalize();
     completeOrder();
-  }
+  });
 });
 
 // ===================== LIVRAISON (téléphone + adresse + frais) =====================
@@ -1555,6 +1632,7 @@ function showDelivery(){
   document.getElementById('pay-cash').classList.toggle('selected', payMethod === 'Espèces');
   document.getElementById('pay-cash-box').classList.toggle('hidden', payMethod !== 'Espèces');
 
+  document.getElementById('deliv-comment').value = order.comment || '';
   updateFeeDisplay();
   showScreen('screen-delivery');
 }
@@ -1595,6 +1673,7 @@ document.getElementById('deliv-done').addEventListener('click', () => {
     lon: (deliveryCalc.lon != null ? deliveryCalc.lon : null),
     payment
   };
+  order.comment = document.getElementById('deliv-comment').value.trim();
   finalize();
   completeOrder();
 });
@@ -1644,17 +1723,22 @@ function snapshotOrder(){
       title: (a.item.typeLabel ? a.item.typeLabel + ' ' : '') + a.item.name,
       aggName: (a.item.typeLabel ? a.item.typeLabel + ' ' : '') + a.item.name + (a.size ? ' — ' + a.size.label : ''),
       base, unit, lineTotal,
+      viandesUsed: a.viandes.concat(a.item.needs || []),   // viandes choisies + viande fixe du produit
       sections: buildSections(a, q)
     };
   });
   const fee = order.delivery ? order.delivery.fee : 0;
   const ts = Date.now();
+  const payMethod = (order.payment && order.payment.method)
+    || (order.delivery && order.delivery.payment && order.delivery.payment.method) || null;
   return {
     num: nextOrderNum(),
     ts,
     date: new Date(ts).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }),
     type: order.type,
     delivery: order.delivery,
+    payMethod,
+    comment: order.comment || '',
     lines, subtotal, fee, total: subtotal + fee
   };
 }
@@ -1686,11 +1770,9 @@ function orderTotalsHTML(snap){
     h += '<div class="rc-tot grand"><span>Total</span><span>' + euro(snap.total) + '</span></div>';
   }
   const pay = snap.delivery && snap.delivery.payment;
-  let paid = snap.total, rendu = 0, label = 'Montant payé';
-  if (pay) {
-    label += ' (' + pay.method + ')';
-    if (pay.method === 'Espèces' && pay.received != null) { paid = pay.received; rendu = Math.max(0, pay.received - snap.total); }
-  }
+  let paid = snap.total, rendu = 0;
+  const label = 'Montant payé' + (snap.payMethod ? ' (' + snap.payMethod + ')' : '');
+  if (pay && pay.method === 'Espèces' && pay.received != null) { paid = pay.received; rendu = Math.max(0, pay.received - snap.total); }
   h += '<div class="rc-tot"><span>' + label + '</span><span>' + euro(paid) + '</span></div>';
   if (rendu > 0) h += '<div class="rc-tot"><span>À rendre</span><span>' + euro(rendu) + '</span></div>';
   return h;
@@ -1705,6 +1787,7 @@ function orderMetaHTML(snap){
 function buildRecapHTML(snap){
   let html = '<h3>Commande N°' + snap.num + ' — ' + escapeHtml(snap.type) + '</h3>';
   html += orderBodyHTML(snap);
+  if (snap.comment) html += '<div class="rc-comment">📝 ' + escapeHtml(snap.comment) + '</div>';
   html += orderTotalsHTML(snap);
   if (snap.delivery) {
     html += '<div class="deliv-info"><strong>Livraison</strong><br>📞 ' + escapeHtml(snap.delivery.phone)
@@ -1733,7 +1816,7 @@ function completeOrder(){
 document.getElementById('btn-print').addEventListener('click', () => printReceipt(lastSnap));
 
 document.getElementById('btn-nouvelle').addEventListener('click', () => {
-  order = { type: null, lines: [], delivery: null };
+  order = { type: null, lines: [], delivery: null, payment: null, comment: '' };
   art = null; flow = []; stepIndex = 0; selectedProductId = null;
   document.querySelectorAll('#opts-type .opt').forEach(o => o.classList.remove('selected'));
   document.getElementById('next-type').disabled = true;
@@ -1815,6 +1898,7 @@ function fillSettingsFields(){
   document.getElementById('set-addr').value = settings.shopAddr || '';
   document.getElementById('set-phone').value = settings.shopPhone || '';
   document.getElementById('set-prep').value = settings.prepMinutes != null ? settings.prepMinutes : 15;
+  document.getElementById('set-dayhour').value = settings.dayResetHour != null ? settings.dayResetHour : 0;
 }
 function openSettings(){
   fillSettingsFields();
@@ -1870,6 +1954,8 @@ function readSettingsFields(){
   settings.shopPhone = document.getElementById('set-phone').value.trim();
   const p = parseInt(document.getElementById('set-prep').value, 10);
   settings.prepMinutes = (!isNaN(p) && p >= 0) ? p : 15;
+  const dh = parseInt(document.getElementById('set-dayhour').value, 10);
+  settings.dayResetHour = (!isNaN(dh) && dh >= 0 && dh <= 23) ? dh : 0;
 }
 document.getElementById('set-save').addEventListener('click', () => {
   settings.autoPrint = document.getElementById('set-autoprint').checked;
@@ -1903,57 +1989,150 @@ document.getElementById('set-test-print').addEventListener('click', () => {
   });
 });
 
-// ===================== ECRAN RECAP DES VENTES =====================
+// ===================== JOUR + REMISES A ZERO (récap) =====================
+const RESETS_KEY = 'bg76_resets';
+let resets = loadResets();
+let recapTab = 'ventes';
+
+function loadResets(){
+  try { return Object.assign({ sales: 0, money: 0 }, JSON.parse(localStorage.getItem(RESETS_KEY) || '{}')); }
+  catch (e) { return { sales: 0, money: 0 }; }
+}
+function saveResets(){
+  try { localStorage.setItem(RESETS_KEY, JSON.stringify(resets)); } catch (e) {}
+  if (cloudOn && db) db.collection('app').doc('resets').set(resets, { merge: true }).catch(() => {});
+}
+function dayKeyOf(ts){
+  const h = settings.dayResetHour || 0;
+  const d = new Date((ts || Date.now()) - h * 3600000);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function dayLabel(key){
+  if (key === dayKeyOf(Date.now())) return "Aujourd'hui";
+  if (key === dayKeyOf(Date.now() - 86400000)) return 'Hier';
+  const p = key.split('-'); return p[2] + '/' + p[1] + '/' + p[0];
+}
+function orderPayMethod(s){ return s.payMethod || (s.delivery && s.delivery.payment && s.delivery.payment.method) || null; }
+function groupByDay(orders){
+  const byDay = {};
+  orders.forEach(s => { const k = dayKeyOf(s.ts); (byDay[k] = byDay[k] || []).push(s); });
+  return byDay;
+}
+// Accordéon "par jour" (aujourd'hui ouvert, les autres repliés) — récap + historique
+function dayAccordion(wrap, byDay, buildBody, buildRight){
+  const todayKey = dayKeyOf(Date.now());
+  Object.keys(byDay).sort().reverse().forEach(dk => {
+    const dayOrders = byDay[dk], isToday = dk === todayKey;
+    const header = document.createElement('button');
+    header.className = 'cat-header' + (isToday ? ' open' : '');
+    header.innerHTML = '<span class="chevron">' + (isToday ? '▾' : '▸') + '</span>'
+      + '<span>' + dayLabel(dk) + '</span><span class="hprice">' + buildRight(dayOrders) + '</span>';
+    const body = document.createElement('div');
+    body.className = isToday ? '' : 'hidden';
+    body.style.margin = '4px 0 14px';
+    buildBody(body, dayOrders);
+    header.addEventListener('click', () => {
+      const willOpen = body.classList.contains('hidden');
+      body.classList.toggle('hidden', !willOpen);
+      header.classList.toggle('open', willOpen);
+      header.querySelector('.chevron').textContent = willOpen ? '▾' : '▸';
+    });
+    wrap.appendChild(header); wrap.appendChild(body);
+  });
+}
+
+// ===================== ECRAN RECAP =====================
 function openRecap(){ renderRecap(); showScreen('screen-recap'); }
+
+document.querySelectorAll('.rtab').forEach(t => {
+  t.addEventListener('click', () => {
+    recapTab = t.dataset.tab;
+    document.querySelectorAll('.rtab').forEach(x => x.classList.toggle('active', x === t));
+    renderRecap();
+  });
+});
 
 function renderRecap(){
   const wrap = document.getElementById('recap-list');
-  const sub = document.getElementById('recap-sub');
   wrap.innerHTML = '';
+  const resetTs = recapTab === 'ventes' ? (resets.sales || 0) : (resets.money || 0);
+  const orders = history.filter(s => (s.ts || 0) > resetTs);
+  if (!orders.length) { wrap.innerHTML = '<div class="history-empty">Aucune donnée pour ce récap.</div>'; return; }
+  const byDay = groupByDay(orders);
+  if (recapTab === 'ventes') {
+    dayAccordion(wrap, byDay,
+      (body, o) => { body.innerHTML = recapVentesHTML(o); },
+      (o) => o.reduce((s, x) => s + x.lines.reduce((y, l) => y + l.qty, 0), 0) + ' art.');
+  } else {
+    dayAccordion(wrap, byDay,
+      (body, o) => { body.innerHTML = recapCaisseHTML(o); },
+      (o) => euro(o.reduce((s, x) => s + x.total, 0)));
+  }
+}
+function recapVentesHTML(orders){
+  const art = {}, via = {};
+  orders.forEach(s => s.lines.forEach(l => {
+    const key = l.aggName || l.title || l.name || 'Article';
+    art[key] = (art[key] || 0) + l.qty;
+    (l.viandesUsed || []).forEach(v => { via[v] = (via[v] || 0) + l.qty; });
+  }));
+  const rowsHtml = obj => {
+    const rows = Object.keys(obj).map(k => ({ k, q: obj[k] })).sort((a, b) => b.q - a.q);
+    if (!rows.length) return '<div class="rc-opt"><span>—</span><span></span></div>';
+    return rows.map(r => '<div class="recap-row"><span class="recap-qty">' + r.q + 'x</span><span class="recap-name">' + escapeHtml(r.k) + '</span><span></span></div>').join('');
+  };
+  return '<div class="rc-sec">ARTICLES</div>' + rowsHtml(art)
+       + '<div class="rc-sec" style="margin-top:12px">VIANDES</div>' + rowsHtml(via);
+}
+function recapCaisseHTML(orders){
+  let cash = 0, card = 0, other = 0;
+  orders.forEach(s => { const m = orderPayMethod(s); if (m === 'Espèces') cash += s.total; else if (m === 'CB') card += s.total; else other += s.total; });
+  let h = '<div class="recap-total"><span>💶 Espèces</span><span>' + euro(cash) + '</span></div>'
+        + '<div class="recap-total"><span>💳 CB</span><span>' + euro(card) + '</span></div>';
+  if (other > 0) h += '<div class="recap-total"><span>Non précisé</span><span>' + euro(other) + '</span></div>';
+  h += '<div class="recap-total grand"><span>Total</span><span>' + euro(cash + card + other) + '</span></div>';
+  return h;
+}
 
-  // Agréger tous les articles de toutes les commandes, par nom (produit + taille)
-  const agg = {};   // name -> { qty, revenue }
-  let articlesTotal = 0, feesTotal = 0, articlesCount = 0;
-  history.forEach(snap => {
-    feesTotal += snap.fee || 0;
-    snap.lines.forEach(l => {
-      const key = l.aggName || l.name || l.title || 'Article';
-      if (!agg[key]) agg[key] = { qty: 0, revenue: 0 };
-      agg[key].qty += l.qty;
-      agg[key].revenue += l.lineTotal;
-      articlesTotal += l.lineTotal;
-      articlesCount += l.qty;
-    });
-  });
-
-  const rows = Object.keys(agg).map(name => ({ name, qty: agg[name].qty, revenue: agg[name].revenue }))
-                     .sort((a, b) => b.qty - a.qty);
-
-  sub.textContent = history.length
-    ? history.length + ' commande' + (history.length > 1 ? 's' : '') + ' · ' + articlesCount + ' article' + (articlesCount > 1 ? 's' : '') + ' vendus'
-    : '';
-
-  if (!rows.length) {
-    wrap.innerHTML = '<div class="history-empty">Aucune vente pour le moment.</div>';
+// Vider ce récap : bouton individuel par onglet ; code 2006 pour la caisse
+let recapClearArmed = false;
+document.getElementById('recap-clear').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  if (recapTab === 'caisse') {
+    askDeleteCode(() => { resets.money = Date.now(); saveResets(); renderRecap(); showToast('Récap caisse vidé'); });
     return;
   }
+  if (!recapClearArmed) {
+    recapClearArmed = true; btn.textContent = 'Confirmer ?';
+    setTimeout(() => { recapClearArmed = false; btn.textContent = 'Vider ce récap'; }, 3000);
+    return;
+  }
+  recapClearArmed = false; btn.textContent = 'Vider ce récap';
+  resets.sales = Date.now(); saveResets(); renderRecap(); showToast('Récap ventes vidé');
+});
 
-  rows.forEach(r => {
-    const el = document.createElement('div');
-    el.className = 'recap-row';
-    el.innerHTML = '<span class="recap-qty">' + r.qty + 'x</span>'
-      + '<span class="recap-name">' + r.name + '</span>'
-      + '<span class="recap-rev">' + euro(r.revenue) + '</span>';
-    wrap.appendChild(el);
-  });
-
-  let totals = '<div class="recap-total"><span>Total articles</span><span>' + euro(articlesTotal) + '</span></div>';
-  if (feesTotal > 0) totals += '<div class="recap-total"><span>Frais de livraison encaissés</span><span>' + euro(feesTotal) + '</span></div>';
-  totals += '<div class="recap-total grand"><span>Total encaissé</span><span>' + euro(articlesTotal + feesTotal) + '</span></div>';
-  const box = document.createElement('div');
-  box.innerHTML = totals;
-  wrap.appendChild(box);
+// Modale code (3 tentatives, code 2006)
+const DELETE_CODE = '2006';
+let codeAttempts = 0, codeOnOk = null;
+function askDeleteCode(onOk){
+  codeAttempts = 0; codeOnOk = onOk;
+  document.getElementById('code-input').value = '';
+  const msg = document.getElementById('code-msg');
+  msg.className = 'modal-msg'; msg.textContent = 'Entrez le code pour vider le récap caisse';
+  document.getElementById('code-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('code-input').focus(), 100);
 }
+document.getElementById('code-cancel').addEventListener('click', () => document.getElementById('code-modal').classList.add('hidden'));
+document.getElementById('code-ok').addEventListener('click', () => {
+  const val = document.getElementById('code-input').value.trim();
+  const msg = document.getElementById('code-msg');
+  if (val === DELETE_CODE) { document.getElementById('code-modal').classList.add('hidden'); if (codeOnOk) codeOnOk(); return; }
+  codeAttempts++;
+  const left = 3 - codeAttempts;
+  document.getElementById('code-input').value = '';
+  if (left <= 0) { document.getElementById('code-modal').classList.add('hidden'); showToast('Code incorrect — suppression annulée'); }
+  else { msg.className = 'modal-msg err'; msg.textContent = 'Code incorrect. ' + left + ' tentative' + (left > 1 ? 's' : '') + ' restante' + (left > 1 ? 's' : ''); }
+});
 
 // ===================== ECRAN HISTORIQUE =====================
 function openHistory(){ renderHistory(); showScreen('screen-history'); }
@@ -1967,28 +2146,28 @@ function renderHistory(){
     wrap.innerHTML = '<div class="history-empty">Aucune commande pour le moment.</div>';
     return;
   }
-  history.forEach(snap => {
-    const header = document.createElement('button');
-    header.className = 'cat-header';
-    header.innerHTML = '<span class="chevron">▸</span>'
-      + '<span>N°' + snap.num + ' · ' + snap.type + ' · ' + snap.date + '</span>'
-      + '<span class="hprice">' + euro(snap.total) + '</span>';
-
-    const body = document.createElement('div');
-    body.className = 'hidden';
-    body.style.margin = '4px 0 12px';
-    body.innerHTML = '<div class="recap">' + buildRecapHTML(snap) + '</div>';
-
-    header.addEventListener('click', () => {
-      const willOpen = body.classList.contains('hidden');
-      body.classList.toggle('hidden', !willOpen);
-      header.classList.toggle('open', willOpen);
-      header.querySelector('.chevron').textContent = willOpen ? '▾' : '▸';
-    });
-
-    wrap.appendChild(header);
-    wrap.appendChild(body);
-  });
+  const byDay = groupByDay(history);
+  dayAccordion(wrap, byDay,
+    (body, dayOrders) => {
+      dayOrders.forEach(snap => {
+        const header = document.createElement('button');
+        header.className = 'cat-header order-header';
+        header.innerHTML = '<span class="chevron">▸</span>'
+          + '<span>N°' + snap.num + ' · ' + snap.type + ' · ' + snap.date + '</span>'
+          + '<span class="hprice">' + euro(snap.total) + '</span>';
+        const b = document.createElement('div');
+        b.className = 'hidden'; b.style.margin = '4px 0 12px';
+        b.innerHTML = '<div class="recap">' + buildRecapHTML(snap) + '</div>';
+        header.addEventListener('click', () => {
+          const w = b.classList.contains('hidden');
+          b.classList.toggle('hidden', !w);
+          header.classList.toggle('open', w);
+          header.querySelector('.chevron').textContent = w ? '▾' : '▸';
+        });
+        body.appendChild(header); body.appendChild(b);
+      });
+    },
+    (dayOrders) => euro(dayOrders.reduce((s, o) => s + o.total, 0)));
 }
 
 // Vider l'historique : double-clic de sécurité
@@ -2051,6 +2230,16 @@ function initCloud(){
       const active = document.querySelector('.screen:not(.hidden)');
       const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest('.settings-form');
       if (active && active.id === 'screen-settings' && !editing) fillSettingsFields();
+    }, () => {});
+
+    // Remises à zéro des récaps (synchronisées entre appareils)
+    db.collection('app').doc('resets').onSnapshot(doc => {
+      const data = doc.data();
+      if (!data) return;
+      resets = Object.assign({ sales: 0, money: 0 }, data);
+      try { localStorage.setItem(RESETS_KEY, JSON.stringify(resets)); } catch (e) {}
+      const active = document.querySelector('.screen:not(.hidden)');
+      if (active && active.id === 'screen-recap') renderRecap();
     }, () => {});
 
     // Adresses clients en temps réel (mémorisées entre appareils)
