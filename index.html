@@ -927,8 +927,8 @@ function buildEscPos(snap){
   const W = DIM.w, H = DIM.h;                    // largeur / hauteur du texte
   const PW = Math.floor(PRINT_W / W);           // colonnes utiles à cette taille
   const sizeByte = (w, h) => ((Math.min(w, 8) - 1) << 4) | (Math.min(h, 8) - 1);
-  // règle la taille ET un interligne aéré proportionnel à la hauteur du texte
-  const setSize = (w, h) => { raw(0x1D, 0x21, sizeByte(w, h)); raw(0x1B, 0x33, Math.min(255, 24 * h + 24)); };
+  // L'espace vient de VRAIES lignes vides (fiable partout), pas de la commande d'interligne (ignorée par RawBT)
+  const setSize = (w, h) => raw(0x1D, 0x21, sizeByte(w, h));
   const setBody  = () => setSize(W, H);          // taille de base du corps
   const setTitle = () => setSize(2, Math.min(H + 1, 3));   // en-tête boutique, plus gros
   const setTotal = () => setSize(W, Math.min(H + 1, 3));   // ligne TOTAL, plus haute
@@ -936,6 +936,7 @@ function buildEscPos(snap){
   const lr = (l, r) => { l = stripAccents(l); r = stripAccents(r); const sp = Math.max(1, PW - l.length - r.length); return l + ' '.repeat(sp) + r; };
 
   raw(0x1B, 0x40);                              // init
+  raw(0x1B, 0x32);                              // interligne standard
   setBody();                                    // tout le ticket à la taille choisie
   raw(0x1B, 0x61, 0x01);                        // centré
   setTitle(); raw(0x1B, 0x45, 0x01);            // nom boutique : plus gros + gras
@@ -949,13 +950,14 @@ function buildEscPos(snap){
   ln(snap.date);
   ln(sep);
   snap.lines.forEach((l, idx) => {
-    if (idx > 0) ln('');                          // espace entre chaque article
+    if (idx > 0) { ln(''); ln(''); }              // grand espace entre chaque article
     raw(0x1B, 0x45, 0x01);
     ln(lr(l.qty + ' x ' + (l.title || l.name || ''), money((l.base != null ? l.base : l.unit || 0) * l.qty)));
     raw(0x1B, 0x45, 0x00);
     (l.sections || []).forEach(sec => {
+      ln('');                                     // air avant chaque rubrique
       ln('  ' + sec.title);
-      sec.rows.forEach(r => ln(lr('    ' + r.label, r.price ? money(r.price) : '')));
+      sec.rows.forEach(r => { ln(''); ln(lr('    ' + r.label, r.price ? money(r.price) : '')); });
     });
   });
   if (snap.comment) { ln(sep); raw(0x1B, 0x45, 0x01); ln('NOTE :'); raw(0x1B, 0x45, 0x00); ln(snap.comment); }
