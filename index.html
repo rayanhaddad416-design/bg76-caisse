@@ -518,6 +518,20 @@
     </div>
   </div>
 
+  <!-- MODALE AJOUT CAISSE (argent hors application) -->
+  <div class="modal-overlay hidden" id="cash-modal">
+    <div class="modal-box">
+      <div class="modal-title">Ajouter à la caisse</div>
+      <div class="modal-msg">Argent encaissé sans passer par l'application</div>
+      <input type="number" inputmode="decimal" id="cash-amount" placeholder="0,00" step="0.01" min="0">
+      <div class="modal-actions">
+        <button class="btn btn-back" id="cash-cancel">Annuler</button>
+        <button class="btn btn-blue" id="cash-especes">💶 Espèces</button>
+        <button class="btn btn-blue" id="cash-cb">💳 CB</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ECRAN STOCK -->
   <div class="screen hidden" id="screen-stock">
     <div class="step-title">Gestion du stock</div>
@@ -597,6 +611,7 @@
     <div class="scroll-wrap" id="recap-list"></div>
     <div class="bottom-bar">
       <div class="spacer"></div>
+      <button class="btn btn-blue" id="recap-add" style="display:none">➕ Ajouter</button>
       <button class="btn btn-outline" id="recap-clear">Vider ce récap</button>
     </div>
   </div>
@@ -2161,8 +2176,10 @@ function readSettingsFields(){
   settings.orientation = ['auto', 'landscape', 'portrait'].includes(or) ? or : 'auto';
 }
 
-// Applique l'orientation choisie (marche surtout quand l'app est installée / plein écran)
-function applyOrientation(){
+// Applique l'orientation choisie. Le verrouillage exige souvent un geste + le plein écran :
+// on tente au chargement, puis on réessaie à chaque contact (et on passe en plein écran une fois).
+let _fsRequested = false;
+function lockOrientationNow(){
   const o = settings.orientation || 'auto';
   try {
     if (!screen.orientation) return;
@@ -2170,6 +2187,20 @@ function applyOrientation(){
     if (screen.orientation.lock) screen.orientation.lock(o === 'portrait' ? 'portrait' : 'landscape').catch(() => {});
   } catch (e) {}
 }
+function applyOrientation(){
+  lockOrientationNow();
+  // au cas où l'app n'est pas installée : le plein écran (au 1er geste) autorise le verrouillage
+  const o = settings.orientation || 'auto';
+  if (o !== 'auto' && !_fsRequested && document.documentElement.requestFullscreen && !document.fullscreenElement) {
+    _fsRequested = true;
+    document.documentElement.requestFullscreen().then(lockOrientationNow, () => {});
+  }
+}
+// Réessaie le verrouillage dès que l'utilisateur touche l'écran (activation requise par le navigateur)
+document.addEventListener('pointerdown', () => {
+  if ((settings.orientation || 'auto') !== 'auto') applyOrientation();
+}, { passive: true });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) lockOrientationNow(); });
 document.getElementById('set-save').addEventListener('click', () => {
   settings.autoPrint = document.getElementById('set-autoprint').checked;
   settings.useRawbt = document.getElementById('set-rawbt').checked;
@@ -2215,6 +2246,18 @@ function loadResets(){
 function saveResets(){
   try { localStorage.setItem(RESETS_KEY, JSON.stringify(resets)); } catch (e) {}
   if (cloudOn && db) db.collection('app').doc('resets').set(resets, { merge: true }).catch(() => {});
+}
+
+// Ajouts d'argent manuels dans la caisse (commandes prises hors application)
+const MANUALCASH_KEY = 'bg76_manualcash';
+let manualCash = loadManualCash();
+function loadManualCash(){
+  try { const a = JSON.parse(localStorage.getItem(MANUALCASH_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function saveManualCash(){
+  try { localStorage.setItem(MANUALCASH_KEY, JSON.stringify(manualCash)); } catch (e) {}
+  if (cloudOn && db) db.collection('app').doc('manualcash').set({ list: manualCash }).catch(() => {});
 }
 function dayKeyOf(ts){
   const h = settings.dayResetHour || 0;
@@ -2269,8 +2312,16 @@ document.querySelectorAll('.rtab').forEach(t => {
 function renderRecap(){
   const wrap = document.getElementById('recap-list');
   wrap.innerHTML = '';
+  // Bouton "Ajouter" visible seulement dans l'onglet Caisse
+  document.getElementById('recap-add').style.display = (recapTab === 'caisse') ? '' : 'none';
   const resetTs = recapTab === 'ventes' ? (resets.sales || 0) : (resets.money || 0);
-  const orders = history.filter(s => (s.ts || 0) > resetTs);
+  let orders = history.filter(s => (s.ts || 0) > resetTs);
+  if (recapTab === 'caisse') {
+    // Ajoute les encaissements manuels comme pseudo-commandes (comptés dans les totaux)
+    const man = (manualCash || []).filter(m => (m.ts || 0) > resetTs)
+      .map(m => ({ ts: m.ts, total: m.amount, payMethod: m.method, _manual: true, lines: [] }));
+    orders = orders.concat(man);
+  }
   if (!orders.length) { wrap.innerHTML = '<div class="history-empty">Aucune donnée pour ce récap.</div>'; return; }
   const byDay = groupByDay(orders);
   if (recapTab === 'ventes') {
@@ -2308,31 +2359,43 @@ function recapCaisseHTML(orders){
   return h;
 }
 
-// Vider ce récap : bouton individuel par onglet ; code 2006 pour la caisse
-let recapClearArmed = false;
-document.getElementById('recap-clear').addEventListener('click', (e) => {
-  const btn = e.currentTarget;
+// Vider ce récap : code 2006 requis dans les deux onglets (ventes ET caisse)
+document.getElementById('recap-clear').addEventListener('click', () => {
   if (recapTab === 'caisse') {
-    askDeleteCode(() => { resets.money = Date.now(); saveResets(); renderRecap(); showToast('Récap caisse vidé'); });
-    return;
+    askDeleteCode(() => { resets.money = Date.now(); saveResets(); renderRecap(); showToast('Récap caisse vidé'); }, 'Entrez le code pour vider le récap caisse');
+  } else {
+    askDeleteCode(() => { resets.sales = Date.now(); saveResets(); renderRecap(); showToast('Récap ventes vidé'); }, 'Entrez le code pour vider le récap ventes');
   }
-  if (!recapClearArmed) {
-    recapClearArmed = true; btn.textContent = 'Confirmer ?';
-    setTimeout(() => { recapClearArmed = false; btn.textContent = 'Vider ce récap'; }, 3000);
-    return;
-  }
-  recapClearArmed = false; btn.textContent = 'Vider ce récap';
-  resets.sales = Date.now(); saveResets(); renderRecap(); showToast('Récap ventes vidé');
 });
+
+// Ajouter de l'argent à la caisse (commande encaissée hors application)
+document.getElementById('recap-add').addEventListener('click', () => {
+  document.getElementById('cash-amount').value = '';
+  document.getElementById('cash-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('cash-amount').focus(), 100);
+});
+document.getElementById('cash-cancel').addEventListener('click', () => document.getElementById('cash-modal').classList.add('hidden'));
+function addCash(method){
+  const raw = (document.getElementById('cash-amount').value || '').replace(',', '.');
+  const amount = parseFloat(raw);
+  if (isNaN(amount) || amount <= 0) { showToast('Montant invalide'); return; }
+  manualCash.push({ ts: Date.now(), amount: Math.round(amount * 100) / 100, method });
+  saveManualCash();
+  document.getElementById('cash-modal').classList.add('hidden');
+  renderRecap();
+  showToast('✓ ' + euro(amount) + ' ajouté (' + method + ')');
+}
+document.getElementById('cash-especes').addEventListener('click', () => addCash('Espèces'));
+document.getElementById('cash-cb').addEventListener('click', () => addCash('CB'));
 
 // Modale code (3 tentatives, code 2006)
 const DELETE_CODE = '2006';
 let codeAttempts = 0, codeOnOk = null;
-function askDeleteCode(onOk){
+function askDeleteCode(onOk, message){
   codeAttempts = 0; codeOnOk = onOk;
   document.getElementById('code-input').value = '';
   const msg = document.getElementById('code-msg');
-  msg.className = 'modal-msg'; msg.textContent = 'Entrez le code pour vider le récap caisse';
+  msg.className = 'modal-msg'; msg.textContent = message || 'Entrez le code pour continuer';
   document.getElementById('code-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('code-input').focus(), 100);
 }
@@ -2384,29 +2447,21 @@ function renderHistory(){
     (dayOrders) => euro(dayOrders.reduce((s, o) => s + o.total, 0)));
 }
 
-// Vider l'historique : double-clic de sécurité
-let clearArmed = false;
-document.getElementById('history-clear').addEventListener('click', (e) => {
-  const btn = e.currentTarget;
-  if (!clearArmed) {
-    clearArmed = true;
-    btn.textContent = 'Confirmer la suppression ?';
-    setTimeout(() => { clearArmed = false; btn.textContent = "Vider l'historique"; }, 3000);
-    return;
-  }
-  clearArmed = false;
-  btn.textContent = "Vider l'historique";
-  if (cloudOn && db) {
-    db.collection('orders').get().then(s => {
-      const batch = db.batch();
-      s.docs.forEach(d => batch.delete(d.ref));
-      return batch.commit();
-    }).catch(() => {});
-  }
-  history = [];
-  saveHistory();
-  renderHistory();
-  showToast('Historique vidé');
+// Vider l'historique : code 2006 requis
+document.getElementById('history-clear').addEventListener('click', () => {
+  askDeleteCode(() => {
+    if (cloudOn && db) {
+      db.collection('orders').get().then(s => {
+        const batch = db.batch();
+        s.docs.forEach(d => batch.delete(d.ref));
+        return batch.commit();
+      }).catch(() => {});
+    }
+    history = [];
+    saveHistory();
+    renderHistory();
+    showToast('Historique vidé');
+  }, "Entrez le code pour vider l'historique");
 });
 document.getElementById('stock-reset').addEventListener('click', () => { stockDraft.clear(); renderStock(); });
 document.getElementById('stock-save').addEventListener('click', () => {
@@ -2452,6 +2507,16 @@ function initCloud(){
       if (!data) return;
       resets = Object.assign({ sales: 0, money: 0 }, data);
       try { localStorage.setItem(RESETS_KEY, JSON.stringify(resets)); } catch (e) {}
+      const active = document.querySelector('.screen:not(.hidden)');
+      if (active && active.id === 'screen-recap') renderRecap();
+    }, () => {});
+
+    // Ajouts manuels de caisse (synchronisés entre appareils)
+    db.collection('app').doc('manualcash').onSnapshot(doc => {
+      const data = doc.data();
+      if (!data || !Array.isArray(data.list)) return;
+      manualCash = data.list;
+      try { localStorage.setItem(MANUALCASH_KEY, JSON.stringify(manualCash)); } catch (e) {}
       const active = document.querySelector('.screen:not(.hidden)');
       if (active && active.id === 'screen-recap') renderRecap();
     }, () => {});
