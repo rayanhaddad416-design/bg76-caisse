@@ -298,6 +298,8 @@
 
   /* Onglets du récap */
   .recap-tabs { display: flex; gap: 10px; margin: 0 0 12px; }
+  .cat-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 14px; }
+  .cat-tab { padding: 22px 12px; font-size: 17px; text-align: center; }
   .rtab { flex: 1; border: 2px solid #e2e6f0; background: #f4f5f7; border-radius: 10px; padding: 12px; font-size: 16px; font-weight: 700; color: #333; cursor: pointer; }
   .rtab.active { background: #0637c8; border-color: #0637c8; color: #fff; }
   .order-header { margin-left: 10px; }
@@ -435,6 +437,16 @@
       <button class="btn btn-back" id="product-back">← Retour</button>
       <div class="spacer"></div>
       <button class="btn btn-blue" id="product-next" disabled style="display:none">Suivant</button>
+    </div>
+  </div>
+
+  <!-- ECRAN 2b : Produits d'une catégorie -->
+  <div class="screen hidden" id="screen-category">
+    <div class="step-title" id="category-title">Catégorie</div>
+    <div class="step-sub">Touchez un produit</div>
+    <div class="scroll-wrap"><div class="grid cat-grid" id="category-list"></div></div>
+    <div class="bottom-bar">
+      <button class="btn btn-back" id="category-back">← Retour</button>
     </div>
   </div>
 
@@ -613,6 +625,18 @@
             <input type="number" id="set-prep" min="0" step="1" placeholder="15">
           </label>
           <button type="button" class="btn btn-outline" id="set-test-print">🖨️ Imprimer un ticket de test</button>
+        </div>
+
+        <button type="button" class="cat-header set-acc"><span class="chevron">▸</span><span>📐 Orientation de l'écran</span></button>
+        <div class="set-sec hidden">
+          <label>Orientation à l'ouverture de l'application
+            <select id="set-orientation">
+              <option value="auto">Automatique (rotation libre)</option>
+              <option value="landscape">Paysage (horizontal)</option>
+              <option value="portrait">Portrait (vertical)</option>
+            </select>
+          </label>
+          <div class="printer-hint">Fonctionne quand l'app est installée sur l'écran d'accueil (mode application). L'orientation choisie est appliquée à chaque ouverture.</div>
         </div>
 
         <button type="button" class="cat-header set-acc"><span class="chevron">▸</span><span>🏪 Infos du ticket</span></button>
@@ -820,7 +844,7 @@ function escapeHtml(s){
 
 // ===================== PARAMETRES (persistant) =====================
 const SETTINGS_KEY = 'bg76_settings';
-const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15, useRawbt: false, dayResetHour: 0 };
+const SETTINGS_DEFAULT = { autoPrint: false, shopName: 'Burger Grill 76', shopAddr: '39 Rue de la République, 76500 Elbeuf', shopPhone: '', prepMinutes: 15, useRawbt: false, dayResetHour: 0, orientation: 'auto' };
 let settings = loadSettings();
 let lastSnap = null;   // dernière commande finie (pour réimprimer)
 
@@ -1238,47 +1262,79 @@ document.querySelectorAll('#opts-type .opt').forEach(opt => {
 document.getElementById('next-type').addEventListener('click', () => { if (order.type) { updateCart(); showScreen('screen-product'); } });
 
 // ===================== ECRAN PRODUIT =====================
+// Catégories laissées en accordéon direct sur l'écran produit (les autres ouvrent une page)
+const INLINE_CATS = new Set(['Nos Tex Mex', 'Poutine', 'Menu Enfant']);
+const CAT_EMOJI = {
+  'Nos Sandwichs': '🥙', 'Nos Burgers Maison': '🍔', 'Tacos des Chefs': '🌮',
+  'Nos Assiettes': '🍽️', 'Nos Maxi Galettes': '🫓',
+  'Nos Tex Mex': '🌶️', 'Poutine': '🍟', 'Menu Enfant': '🧒'
+};
+
+// Remplit une grille avec les produits d'une catégorie (partagé accordéon + sous-page)
+function renderProductGrid(cat, grid){
+  grid.innerHTML = '';
+  cat.items.forEach(item => {
+    const el = document.createElement('div');
+    el.dataset.id = item.id;
+    const available = isProductAvailable(item);
+    let priceHint = item.sizes
+      ? (item.sizes.length > 1 ? 'dès ' + euro(item.sizes[0].price) : euro(item.sizes[0].price))
+      : euro(item.price);
+    el.className = 'opt opt-sm' + (available ? '' : ' out');
+    el.innerHTML = item.name
+      + (item.desc ? '<div class="desc">' + item.desc + '</div>' : '')
+      + (available ? '<div class="price-badge">' + priceHint + '</div>'
+                   : '<div class="out-badge">Plus en stock</div>');
+    if (available) {
+      el.addEventListener('click', () => { selectedProductId = item.id; startArticle(item); });   // on avance directement
+    }
+    grid.appendChild(el);
+  });
+}
+
 function buildProductList(){
   const wrap = document.getElementById('product-list');
   wrap.innerHTML = '';
+  // Grosses catégories : boutons-onglets (style Récap) qui ouvrent une page dédiée
+  const tabs = document.createElement('div');
+  tabs.className = 'cat-tabs';
   MENU.forEach(cat => {
+    if (INLINE_CATS.has(cat.title)) return;
+    const btn = document.createElement('button');
+    btn.className = 'rtab cat-tab';
+    btn.innerHTML = (CAT_EMOJI[cat.title] || '🍴') + ' ' + cat.title;
+    btn.addEventListener('click', () => openCategory(cat));
+    tabs.appendChild(btn);
+  });
+  wrap.appendChild(tabs);
+  // Petites catégories : accordéon dépliable directement sur l'écran
+  MENU.forEach(cat => {
+    if (!INLINE_CATS.has(cat.title)) return;
     const header = document.createElement('button');
     header.className = 'cat-header';
-    header.innerHTML = '<span class="chevron">▸</span><span>' + cat.title + '</span>';
-
+    header.innerHTML = '<span class="chevron">▸</span><span>' + (CAT_EMOJI[cat.title] || '') + ' ' + cat.title + '</span>';
     const grid = document.createElement('div');
     grid.className = 'grid cat-grid hidden';
-
-    cat.items.forEach(item => {
-      const el = document.createElement('div');
-      el.dataset.id = item.id;
-      const available = isProductAvailable(item);
-      let priceHint = item.sizes
-        ? (item.sizes.length > 1 ? 'dès ' + euro(item.sizes[0].price) : euro(item.sizes[0].price))
-        : euro(item.price);
-      el.className = 'opt opt-sm' + (available ? '' : ' out');
-      el.innerHTML = item.name
-        + (item.desc ? '<div class="desc">' + item.desc + '</div>' : '')
-        + (available ? '<div class="price-badge">' + priceHint + '</div>'
-                     : '<div class="out-badge">Plus en stock</div>');
-      if (available) {
-        el.addEventListener('click', () => { selectedProductId = item.id; startArticle(item); });   // on avance directement
-      }
-      grid.appendChild(el);
-    });
-
+    renderProductGrid(cat, grid);
     header.addEventListener('click', () => {
       const willOpen = grid.classList.contains('hidden');
       grid.classList.toggle('hidden', !willOpen);
       header.classList.toggle('open', willOpen);
       header.querySelector('.chevron').textContent = willOpen ? '▾' : '▸';
     });
-
     wrap.appendChild(header);
     wrap.appendChild(grid);
   });
 }
 
+// Ouvre la page listant tous les produits d'une catégorie
+function openCategory(cat){
+  document.getElementById('category-title').textContent = cat.title;
+  renderProductGrid(cat, document.getElementById('category-list'));
+  showScreen('screen-category');
+}
+
+document.getElementById('category-back').addEventListener('click', () => showScreen('screen-product'));
 document.getElementById('product-back').addEventListener('click', () => showScreen('screen-type'));
 document.getElementById('product-next').addEventListener('click', () => {
   if (!selectedProductId) return;
@@ -2040,6 +2096,7 @@ function fillSettingsFields(){
   document.getElementById('set-phone').value = settings.shopPhone || '';
   document.getElementById('set-prep').value = settings.prepMinutes != null ? settings.prepMinutes : 15;
   document.getElementById('set-dayhour').value = settings.dayResetHour != null ? settings.dayResetHour : 0;
+  document.getElementById('set-orientation').value = settings.orientation || 'auto';
 }
 function openSettings(){
   fillSettingsFields();
@@ -2097,12 +2154,25 @@ function readSettingsFields(){
   settings.prepMinutes = (!isNaN(p) && p >= 0) ? p : 15;
   const dh = parseInt(document.getElementById('set-dayhour').value, 10);
   settings.dayResetHour = (!isNaN(dh) && dh >= 0 && dh <= 23) ? dh : 0;
+  const or = document.getElementById('set-orientation').value;
+  settings.orientation = ['auto', 'landscape', 'portrait'].includes(or) ? or : 'auto';
+}
+
+// Applique l'orientation choisie (marche surtout quand l'app est installée / plein écran)
+function applyOrientation(){
+  const o = settings.orientation || 'auto';
+  try {
+    if (!screen.orientation) return;
+    if (o === 'auto') { if (screen.orientation.unlock) screen.orientation.unlock(); return; }
+    if (screen.orientation.lock) screen.orientation.lock(o === 'portrait' ? 'portrait' : 'landscape').catch(() => {});
+  } catch (e) {}
 }
 document.getElementById('set-save').addEventListener('click', () => {
   settings.autoPrint = document.getElementById('set-autoprint').checked;
   settings.useRawbt = document.getElementById('set-rawbt').checked;
   readSettingsFields();
   saveSettings();
+  applyOrientation();
   showToast('✓ Paramètres enregistrés');
 });
 document.getElementById('set-test-print').addEventListener('click', () => {
@@ -2406,6 +2476,7 @@ buildStockLinks();
 buildProductList();
 updateCart();
 setActiveNav('order');
+applyOrientation();
 initCloud();
 
 // ===================== PWA : service worker + mise à jour automatique =====================
