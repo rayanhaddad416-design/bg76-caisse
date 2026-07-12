@@ -735,21 +735,24 @@ const MENU = [
     { id:"assiette-3", name:"Assiette 3 viandes", desc:"3 viandes au choix, crudités, frites", price:15.00, flow:{viandes:3,sauce:true,crudites:true,extras:true} },
   ]},
   { title: "Nos Maxi Galettes", items: [
-    { id:"galette-1", name:"Maxi Galette 1 viande",  desc:"1 viande au choix", price:8.00,  flow:{viandes:1,sauce:true,crudites:true} },
-    { id:"galette-2", name:"Maxi Galette 2 viandes", desc:"2 viandes au choix", price:9.00,  flow:{viandes:2,sauce:true,crudites:true} },
-    { id:"galette-3", name:"Maxi Galette 3 viandes", desc:"3 viandes au choix", price:11.00, flow:{viandes:3,sauce:true,crudites:true} },
+    { id:"galette-1", name:"Maxi Galette 1 viande",  desc:"1 viande au choix", price:8.00,  flow:{viandes:1,sauce:true,crudites:true,extras:true} },
+    { id:"galette-2", name:"Maxi Galette 2 viandes", desc:"2 viandes au choix", price:9.00,  flow:{viandes:2,sauce:true,crudites:true,extras:true} },
+    { id:"galette-3", name:"Maxi Galette 3 viandes", desc:"3 viandes au choix", price:11.00, flow:{viandes:3,sauce:true,crudites:true,extras:true} },
   ]},
   { title: "Nos Tex Mex", items: [
-    { id:"wings5",     name:"Wings x5",     desc:"5 wings", price:6.50, flow:{sauce:true} },
-    { id:"tenders5",   name:"Tenders x5",   desc:"5 tenders", price:6.50, flow:{sauce:true} },
-    { id:"mixfamily",  name:"Mix Family x30",desc:"30 tenders / 30 wings / 15+15 + 3 frites", price:30.00, flow:{} },
+    { id:"wings5",     name:"Wings x5",     desc:"5 wings", price:6.50, flow:{sauce:true,extras:true} },
+    { id:"tenders5",   name:"Tenders x5",   desc:"5 tenders", price:6.50, flow:{sauce:true,extras:true} },
+    { id:"mixfamily",  name:"Mix Family x30",desc:"30 tenders / 30 wings / 15+15 + 3 frites", price:30.00, flow:{extras:true} },
   ]},
   { title: "Poutine", items: [
-    { id:"poutine", name:"Poutine", desc:"Tenders, frites, cheddar fondu, oignons frits", price:7.50, flow:{} },
+    { id:"poutine", name:"Poutine", desc:"Tenders, frites, cheddar fondu, oignons frits", price:7.50, flow:{extras:true} },
   ]},
   { title: "Menu Enfant", items: [
-    { id:"enfant-nuggets", name:"Menu Enfant Nuggets", desc:"5 nuggets + frites + Capri-Sun", price:5.50, sauceFree:1, sauceMax:1, flow:{sauce:true} },
-    { id:"enfant-cheese",  name:"Menu Enfant Cheeseburger", desc:"Cheeseburger + frites + Capri-Sun", price:5.50, sauceFree:1, sauceMax:1, flow:{sauce:true} },
+    { id:"enfant-nuggets", name:"Menu Enfant Nuggets", desc:"5 nuggets + frites + Capri-Sun", price:5.50, sauceFree:1, sauceMax:1, flow:{sauce:true,extras:true} },
+    { id:"enfant-cheese",  name:"Menu Enfant Cheeseburger", desc:"Cheeseburger + frites + Capri-Sun", price:5.50, sauceFree:1, sauceMax:1, flow:{sauce:true,extras:true} },
+  ]},
+  { title: "Frites", items: [
+    { id:"frites", name:"Frites", desc:"", sizes:[{label:"Moyenne",price:3.00},{label:"Grande",price:5.00}], flow:{extras:true} },
   ]},
 ];
 
@@ -1263,11 +1266,11 @@ document.getElementById('next-type').addEventListener('click', () => { if (order
 
 // ===================== ECRAN PRODUIT =====================
 // Catégories laissées en accordéon direct sur l'écran produit (les autres ouvrent une page)
-const INLINE_CATS = new Set(['Nos Tex Mex', 'Poutine', 'Menu Enfant']);
+const INLINE_CATS = new Set(['Nos Tex Mex', 'Poutine', 'Menu Enfant', 'Frites']);
 const CAT_EMOJI = {
   'Nos Sandwichs': '🥙', 'Nos Burgers Maison': '🍔', 'Tacos des Chefs': '🌮',
   'Nos Assiettes': '🍽️', 'Nos Maxi Galettes': '🫓',
-  'Nos Tex Mex': '🌶️', 'Poutine': '🍟', 'Menu Enfant': '🧒'
+  'Nos Tex Mex': '🌶️', 'Poutine': '🥣', 'Menu Enfant': '🧒', 'Frites': '🍟'
 };
 
 // Remplit une grille avec les produits d'une catégorie (partagé accordéon + sous-page)
@@ -2081,7 +2084,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-document.getElementById('nav-order').addEventListener('click', () => { showScreen(currentOrderScreen); closeMenu(); });
+document.getElementById('nav-order').addEventListener('click', () => { showScreen('screen-type'); closeMenu(); });
 document.getElementById('nav-stock').addEventListener('click', () => { openStock(); closeMenu(); });
 document.getElementById('nav-history').addEventListener('click', () => { openHistory(); closeMenu(); });
 document.getElementById('nav-recap').addEventListener('click', () => { openRecap(); closeMenu(); });
