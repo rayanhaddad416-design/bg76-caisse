@@ -298,8 +298,8 @@
 
   /* Onglets du récap */
   .recap-tabs { display: flex; gap: 10px; margin: 0 0 12px; }
-  .cat-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 14px; }
-  .cat-tab { padding: 22px 12px; font-size: 17px; text-align: center; }
+  .cat-tabs { display: flex; gap: 10px; margin: 4px 0 14px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 8px; align-items: stretch; }
+  .cat-tabs .cat-tab { flex: 0 0 calc(50% - 5px); scroll-snap-align: start; padding: 22px 12px; font-size: 17px; text-align: center; }
   .rtab { flex: 1; border: 2px solid #e2e6f0; background: #f4f5f7; border-radius: 10px; padding: 12px; font-size: 16px; font-weight: 700; color: #333; cursor: pointer; }
   .rtab.active { background: #0637c8; border-color: #0637c8; color: #fff; }
   .order-header { margin-left: 10px; }
