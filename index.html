@@ -1224,7 +1224,7 @@ function articleName(a){
 
 function details(a){
   const parts = [];
-  if (a.viandes.length) parts.push('Viandes : ' + a.viandes.join(', '));
+  if (a.viandes.length) parts.push('Viandes : ' + groupSauces(a.viandes).join(', '));
   if (a.cuisson)        parts.push('Cuisson : ' + a.cuisson);
   if (a.sauces && a.sauces.length){
     let sp = 'Sauces : ' + groupSauces(a.sauces).join(', ');
@@ -1233,7 +1233,11 @@ function details(a){
     parts.push(sp);
   }
   if (a.item.flow.crudites) parts.push(a.crudites.length ? a.crudites.join(', ') : 'sans crudités');
-  if (a.extras.length)  parts.push('Extras : ' + a.extras.map(e => e + ' (+' + euro(EXTRA_PRICES[e]) + ')').join(', '));
+  if (a.extras.length){
+    const m = {}, order = [];
+    a.extras.forEach(e => { if (!(e in m)) { m[e] = 0; order.push(e); } m[e]++; });
+    parts.push('Extras : ' + order.map(e => (m[e] > 1 ? m[e] + 'x ' : '') + e + ' (+' + euro((EXTRA_PRICES[e] || 0) * m[e]) + ')').join(', '));
+  }
   return parts.join('  ·  ');
 }
 
@@ -1386,7 +1390,9 @@ function renderStep(){
   const titleEl = document.getElementById('step-title');
   const subEl = document.getElementById('step-sub');
 
-  if (key === 'sauce') { renderSauceStep(); return; }
+  if (key === 'sauce')   { renderSauceStep(); return; }
+  if (key === 'viandes') { renderViandeStep(); return; }
+  if (key === 'extras')  { renderExtraStep(); return; }
 
   function isSel(v){
     switch (key){
@@ -1522,6 +1528,87 @@ function renderSauceStep(){
   build();
   updateSub();
   nextBtn.disabled = false;   // les sauces sont facultatives
+}
+
+// Etape viandes : quantités (on peut choisir plusieurs fois la même), total = nombre requis
+function renderViandeStep(){
+  const grid = document.getElementById('step-options');
+  const nextBtn = document.getElementById('step-next');
+  const req = requiredViandes();
+  if (art.viandes.length > req) art.viandes = art.viandes.slice(0, req);
+  document.getElementById('step-title').textContent = 'Les viandes';
+
+  function updateSub(){
+    const n = art.viandes.length;
+    document.getElementById('step-sub').textContent = 'Choisissez ' + req + ' viande' + (req > 1 ? 's' : '') + '   —   ' + n + '/' + req;
+    nextBtn.disabled = n !== req;
+  }
+  function build(){
+    grid.innerHTML = '';
+    const atMax = art.viandes.length >= req;
+    VIANDES.forEach(v => {
+      const isOut = outOfStock.has('viande:' + v);
+      const count = art.viandes.filter(x => x === v).length;
+      const el = document.createElement('div');
+      el.className = 'opt opt-sm sauce-card' + (count > 0 ? ' selected' : '') + (isOut ? ' out' : '');
+      el.innerHTML = '<div class="sauce-name">' + v + '</div>'
+        + (isOut
+            ? '<div class="out-badge">Plus en stock</div>'
+            : '<div class="stepper">'
+              +   '<button class="step-btn minus" ' + (count === 0 ? 'disabled' : '') + '>−</button>'
+              +   '<span class="step-count">' + count + '</span>'
+              +   '<button class="step-btn plus" ' + (atMax ? 'disabled' : '') + '>+</button>'
+              + '</div>');
+      if (!isOut) {
+        el.querySelector('.plus').addEventListener('click', () => { if (art.viandes.length < req) { art.viandes.push(v); build(); updateSub(); } });
+        el.querySelector('.minus').addEventListener('click', () => { const i = art.viandes.indexOf(v); if (i >= 0) { art.viandes.splice(i, 1); build(); updateSub(); } });
+      }
+      grid.appendChild(el);
+    });
+  }
+  build();
+  updateSub();
+}
+
+// Etape extras : quantités (on peut choisir plusieurs fois le même), facultatif, chaque unité facturée
+function renderExtraStep(){
+  const grid = document.getElementById('step-options');
+  const nextBtn = document.getElementById('step-next');
+  document.getElementById('step-title').textContent = 'Les extras';
+
+  function updateSub(){
+    const n = art.extras.length;
+    let sur = 0; art.extras.forEach(e => sur += (EXTRA_PRICES[e] || 0));
+    let s = 'Facultatif — appuyez sur + pour ajouter';
+    if (n > 0) s += '   —   ' + n + ' extra' + (n > 1 ? 's' : '') + ' · +' + euro(sur);
+    document.getElementById('step-sub').textContent = s;
+  }
+  function build(){
+    grid.innerHTML = '';
+    EXTRAS.forEach(v => {
+      const isOut = outOfStock.has('extra:' + v);
+      const count = art.extras.filter(x => x === v).length;
+      const el = document.createElement('div');
+      el.className = 'opt opt-sm sauce-card' + (count > 0 ? ' selected' : '') + (isOut ? ' out' : '');
+      el.innerHTML = '<div class="sauce-name">' + v + '</div>'
+        + '<div class="price-badge">+' + euro(EXTRA_PRICES[v] || 0) + '</div>'
+        + (isOut
+            ? '<div class="out-badge">Plus en stock</div>'
+            : '<div class="stepper">'
+              +   '<button class="step-btn minus" ' + (count === 0 ? 'disabled' : '') + '>−</button>'
+              +   '<span class="step-count">' + count + '</span>'
+              +   '<button class="step-btn plus">+</button>'
+              + '</div>');
+      if (!isOut) {
+        el.querySelector('.plus').addEventListener('click', () => { art.extras.push(v); build(); updateSub(); });
+        el.querySelector('.minus').addEventListener('click', () => { const i = art.extras.indexOf(v); if (i >= 0) { art.extras.splice(i, 1); build(); updateSub(); } });
+      }
+      grid.appendChild(el);
+    });
+  }
+  build();
+  updateSub();
+  nextBtn.disabled = false;   // les extras sont facultatifs
 }
 
 // Navigation dans les étapes
@@ -1906,12 +1993,19 @@ function groupLines(lines){
 
 function rcRow(q, label, unitPrice){ return { label: label, price: unitPrice * q }; }
 
+// Regroupe une liste (viandes/extras) en lignes "Nx label" avec prix cumulé
+function countRows(list, q, priceOf){
+  const m = {}, order = [];
+  list.forEach(x => { if (!(x in m)) { m[x] = 0; order.push(x); } m[x]++; });
+  return order.map(x => rcRow(q, (m[x] > 1 ? m[x] + 'x ' : '') + x, (priceOf ? priceOf(x) : 0) * m[x]));
+}
+
 // Détaille un article en sections (PAIN / SAUCE / CRUDITÉS / EXTRAS...) comme sur le ticket
 function buildSections(a, q){
   const item = a.item, secs = [];
   if (a.size)        secs.push({ title: 'TAILLE',   rows: [ rcRow(q, a.size.label, 0) ] });
   if (a.cuisson)     secs.push({ title: 'CUISSON',  rows: [ rcRow(q, a.cuisson, 0) ] });
-  if (a.viandes.length) secs.push({ title: 'VIANDES', rows: a.viandes.map(v => rcRow(q, v, 0)) });
+  if (a.viandes.length) secs.push({ title: 'VIANDES', rows: countRows(a.viandes, q) });
   if (a.pain)        secs.push({ title: 'PAIN',     rows: [ rcRow(q, a.pain === 'Galette' ? 'Galette' : 'Pain sandwich', 0) ] });
   if (a.sauces.length) {
     const free = item.sauceFree || 2;
@@ -1921,7 +2015,7 @@ function buildSections(a, q){
     const rows = a.crudites.length ? a.crudites.map(c => rcRow(q, c.toLowerCase(), 0)) : [ { label: 'sans crudités', price: 0 } ];
     secs.push({ title: 'CRUDITÉS', rows });
   }
-  if (a.extras.length) secs.push({ title: 'EXTRAS', rows: a.extras.map(e => rcRow(q, e, EXTRA_PRICES[e] || 0)) });
+  if (a.extras.length) secs.push({ title: 'EXTRAS', rows: countRows(a.extras, q, e => EXTRA_PRICES[e] || 0) });
   return secs;
 }
 
