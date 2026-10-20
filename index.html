@@ -22,6 +22,14 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
 
+  /* Borne : rien n'est selectionnable ni deplacable, pas de menu "enregistrer
+     l'image" sur appui long. Les champs de saisie gardent tout cela. */
+  html, body { -webkit-user-select: none; -ms-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  img { -webkit-user-drag: none; -khtml-user-drag: none; -moz-user-drag: none; user-drag: none; }
+  input, textarea, select {
+    -webkit-user-select: text; -ms-user-select: text; user-select: text; -webkit-touch-callout: default;
+  }
+
   body {
     background: #f4f5f7;
     height: 100vh;
@@ -194,6 +202,9 @@
   /* Photo du produit : fond blanc des photos = fond blanc de la carte,
      on garde l'image entiere (pas de recadrage) */
   .opt-photo { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: contain; margin-bottom: 4px; }
+  /* Borne tactile : l'appui sur une photo choisit le produit, il ne doit jamais
+     deplacer l'image ni proposer de l'enregistrer. Le clic passe a la carte. */
+  .opt-photo, .kiosk-brand img { pointer-events: none; }
   .kiosk-grid .opt.with-photo { padding-top: 10px; }
   .opt.out .opt-photo { filter: grayscale(1); opacity: 0.45; }
 
@@ -549,7 +560,7 @@
     <div class="kiosk" id="kiosk">
       <div class="kiosk-cats" id="kiosk-cats"></div>
       <div class="kiosk-products">
-        <div class="kiosk-brand" id="kiosk-brand"><img src="./logo.png" alt="Burger Grill 76"></div>
+        <div class="kiosk-brand" id="kiosk-brand"><img src="./logo.png" alt="Burger Grill 76" draggable="false"></div>
         <div class="kiosk-grid hidden" id="kiosk-grid"></div>
       </div>
     </div>
@@ -1388,6 +1399,15 @@ function updateCart(){
   document.getElementById('cartInfo').textContent = t;
 }
 
+// ===================== COMPORTEMENT BORNE =====================
+// Un client ne doit pas pouvoir déplacer une photo ni ouvrir le menu
+// « enregistrer l'image ». Les champs de saisie gardent le clic droit,
+// pour que le responsable puisse coller du texte dans les paramètres.
+document.addEventListener('dragstart', e => e.preventDefault());
+document.addEventListener('contextmenu', e => {
+  if (!e.target.closest('input, textarea')) e.preventDefault();
+});
+
 // ===================== ECRAN TYPE =====================
 document.querySelectorAll('#opts-type .opt').forEach(opt => {
   opt.addEventListener('click', () => {
@@ -1467,7 +1487,7 @@ function renderProductGrid(cat, grid){
       ? (item.sizes.length > 1 ? 'dès ' + euro(item.sizes[0].price) : euro(item.sizes[0].price))
       : euro(item.price);
     el.className = 'opt opt-sm' + (available ? '' : ' out') + (PHOTOS[item.id] ? ' with-photo' : '');
-    el.innerHTML = (PHOTOS[item.id] ? '<img class="opt-photo" src="' + PHOTOS[item.id] + '" alt="">' : '')
+    el.innerHTML = (PHOTOS[item.id] ? '<img class="opt-photo" src="' + PHOTOS[item.id] + '" alt="" draggable="false">' : '')
       + item.name
       + (item.desc ? '<div class="desc">' + item.desc + '</div>' : '')
       + (available ? '<div class="price-badge">' + priceHint + '</div>'
