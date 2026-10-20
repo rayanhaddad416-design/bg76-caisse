@@ -156,49 +156,6 @@
   }
   .opt.selected .price-badge { color: #fff; background: rgba(255,255,255,0.22); }
 
-  /* ===== Ecran d'accueil (attente client) ===== */
-  #screen-splash {
-    position: absolute; inset: 0; z-index: 30; overflow: hidden;
-    background: #000; cursor: pointer; user-select: none;
-  }
-  .splash-top { flex-shrink: 0; background: #f4f0e6; color: #14110e; text-align: center; padding: 16px 10px; }
-  .splash-brand {
-    font-family: Georgia, 'Times New Roman', serif; line-height: 1;
-    font-size: clamp(32px, 7vh, 60px); font-weight: 700; letter-spacing: 4px;
-  }
-  .splash-hero {
-    flex: 1; min-height: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 14px;
-    padding: 20px 18px; text-align: center;
-    /* si tu deposes une photo "splash.jpg" dans le dossier, elle s'affiche ici */
-    background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.75)), url('./splash.jpg'),
-                radial-gradient(circle at 50% 42%, #2b2b2b 0%, #0b0b0b 72%);
-    background-size: cover; background-position: center; background-repeat: no-repeat;
-  }
-  .splash-hero h1 {
-    color: #fff; font-size: clamp(22px, 5vh, 40px); font-weight: 800;
-    letter-spacing: 1px; line-height: 1.15; text-shadow: 0 2px 14px rgba(0,0,0,0.6);
-  }
-  .splash-hero p { color: #d8d4cc; font-size: clamp(13px, 2.2vh, 19px); }
-
-  .splash-pay {
-    flex-shrink: 0; background: #14110e; display: flex; flex-wrap: wrap;
-    align-items: center; justify-content: center; gap: clamp(8px, 2.6vw, 28px); padding: 11px 10px;
-  }
-  .pay-mark {
-    background: #fff; border-radius: 7px; height: 36px; padding: 0 11px;
-    display: flex; align-items: center; justify-content: center; gap: 4px;
-    font-size: 14px; font-weight: 700; color: #111; white-space: nowrap;
-  }
-  .pay-mark svg { display: block; }
-  .mc-dot { width: 17px; height: 17px; border-radius: 50%; }
-  .mc-left { background: #eb001b; }
-  .mc-right { background: #f79e1b; margin-left: -7px; }
-
-  .splash-start { flex-shrink: 0; background: #2f5d4f; color: #fff; text-align: center; padding: 18px 10px 22px; }
-  .splash-start .s1 { font-size: clamp(20px, 4vh, 33px); font-weight: 700; }
-  .splash-start .s2 { font-size: clamp(12px, 2vh, 18px); opacity: 0.85; margin-top: 3px; }
-
   /* ===== Ecran commande facon borne : colonne de categories + grille de produits ===== */
   .kiosk { flex: 1; min-height: 0; display: flex; gap: 16px; }
 
@@ -225,18 +182,11 @@
   }
   .kiosk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 13px; }
 
-  /* Deux temps : d'abord les categories en plein ecran, puis les produits seuls.
-     Le bouton "Retour" en bas ramene les categories. */
-  .kiosk.cats-open .kiosk-products { display: none; }
-  .kiosk.cats-open .kiosk-cats {
-    width: 100%; flex: 1; border-right: none; padding: 2px 4px 10px;
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
-    gap: 14px; align-content: start;
+  /* Tant qu'aucune categorie n'est choisie, le logo occupe la zone des produits */
+  .kiosk-brand {
+    min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px;
   }
-  .kiosk.cats-open .kcat { padding: 26px 10px; font-size: 16.5px; }
-  .kiosk.cats-open .kcat-ic { font-size: 40px; margin-bottom: 10px; }
-  .kiosk.cats-open .kcat.active { background: #fff; border-color: #e2e6f0; color: #333; }
-  .kiosk:not(.cats-open) .kiosk-cats { display: none; }
+  .kiosk-brand img { width: min(62%, 290px); height: auto; }
 
   /* Barres de défilement fines et discrètes dans les deux colonnes */
   .kiosk-cats::-webkit-scrollbar, .kiosk-products::-webkit-scrollbar { width: 7px; }
@@ -262,7 +212,25 @@
 
   .hidden { display: none !important; }
 
-  .cart-info { position: absolute; top: 20px; right: 22px; font-size: 14px; color: #555; font-weight: 600; }
+  .cart-info { position: absolute; top: 22px; right: 22px; font-size: 14px; color: #555; font-weight: 600; max-width: 42%; text-align: right; }
+
+  /* Bouton Responsable (haut gauche) + sa page */
+  .btn-resp {
+    position: absolute; top: 12px; left: 14px; z-index: 26;
+    border: 2px solid #cfd6e6; background: #fff; border-radius: 9px;
+    padding: 8px 14px; font-family: inherit; font-size: 14px; font-weight: 700;
+    color: #333; cursor: pointer; transition: all 0.12s ease;
+  }
+  .btn-resp:hover { background: #f0f4ff; border-color: #0637c8; color: #0637c8; }
+
+  .admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .admin-tile {
+    border: 2px solid #e2e6f0; background: #fff; border-radius: 14px; padding: 30px 12px;
+    font-family: inherit; font-size: 18px; font-weight: 700; color: #333; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 10px; transition: all 0.12s ease;
+  }
+  .admin-tile:hover { background: #f0f4ff; border-color: #0637c8; }
+  .admin-ic { font-size: 42px; line-height: 1; }
 
   /* Recap (confirmation + merci) */
   .recap { background: #f4f5f7; border-radius: 10px; padding: 18px 24px; text-align: left; font-size: 15px; width: 100%; }
@@ -488,6 +456,11 @@
     .kcat { font-size: 11.5px; padding: 10px 4px; }
     .kcat-ic { font-size: 22px; margin-bottom: 4px; }
     .kiosk-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .btn-resp { top: 10px; left: 10px; padding: 7px 10px; font-size: 12.5px; }
+    .cart-info { top: 14px; right: 12px; max-width: 50%; }
+    .admin-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 11px; }
+    .admin-tile { padding: 20px 8px; font-size: 15px; }
+    .admin-ic { font-size: 32px; }
   }
 </style>
 </head>
@@ -505,41 +478,30 @@
     <button class="nav-btn hidden" id="nav-recap"><span class="nav-ic">📊</span> Récap</button>
     <button class="nav-btn" id="nav-settings"><span class="nav-ic">⚙️</span> Paramètres</button>
   </nav>
+  <button class="btn-resp" id="btn-resp">🔒 Responsable</button>
   <div class="cart-info" id="cartInfo"></div>
   <div class="toast hidden" id="toast">✓ Stock enregistré</div>
 
-  <!-- ECRAN 0 : accueil, affiché à l'ouverture de l'application -->
-  <div class="screen" id="screen-splash">
-    <div class="splash-top"><div class="splash-brand">BG.76</div></div>
-    <div class="splash-hero">
-      <h1>NOS CRÉATIONS SIGNATURE</h1>
-      <p>Découvrez nos saveurs uniques</p>
-    </div>
-    <div class="splash-pay">
-      <div class="pay-mark" title="Sans contact">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.1" stroke-linecap="round">
-          <path d="M6 5c3.6 3.4 3.6 10.6 0 14"/><path d="M11 3c4.8 4.5 4.8 13.5 0 18"/><path d="M16 1.5c6 5.6 6 15.4 0 21"/>
-        </svg>
-      </div>
-      <div class="pay-mark">Apple&nbsp;Pay</div>
-      <div class="pay-mark"><span style="color:#4285f4">G</span>&nbsp;Pay</div>
-      <div class="pay-mark" title="Mastercard">
-        <span class="mc-dot mc-left"></span><span class="mc-dot mc-right"></span>
-      </div>
-      <div class="pay-mark" title="Carte sans contact">
-        <svg width="22" height="20" viewBox="0 0 26 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round">
-          <rect x="1.2" y="6" width="13" height="9" rx="1.6"/><path d="M19 7.5c2.6 2.6 2.6 6.4 0 9"/><path d="M23 4.5c4.3 4.3 4.3 11.7 0 15"/>
-        </svg>
+  <!-- ESPACE RESPONSABLE : tout ce qui est retiré de la vue client -->
+  <div class="screen hidden" id="screen-admin">
+    <div class="step-title">Espace responsable</div>
+    <div class="step-sub">Réservé au personnel</div>
+    <div class="scroll-wrap">
+      <div class="admin-grid">
+        <button class="admin-tile" data-go="stock"><span class="admin-ic">📦</span>Stock</button>
+        <button class="admin-tile" data-go="recap"><span class="admin-ic">📊</span>Récap</button>
+        <button class="admin-tile" data-go="history"><span class="admin-ic">🕘</span>Historique</button>
+        <button class="admin-tile" data-go="settings"><span class="admin-ic">⚙️</span>Paramètres</button>
       </div>
     </div>
-    <div class="splash-start">
-      <div class="s1">Appuyez pour commencer</div>
-      <div class="s2">Touchez pour débuter</div>
+    <div class="bottom-bar">
+      <button class="btn btn-back" id="admin-back">← Retour à la commande</button>
+      <div class="spacer"></div>
     </div>
   </div>
 
   <!-- ECRAN 1 : Type de commande -->
-  <div class="screen hidden" id="screen-type">
+  <div class="screen" id="screen-type">
     <svg class="deco deco-tr" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path d="M300,0 V210 C250,205 240,120 175,140 C120,157 95,95 140,60 C180,30 175,0 175,0 Z" fill="#0637c8"/>
       <path d="M300,0 V150 C255,150 250,85 190,95 C140,103 150,30 200,25 C245,20 240,0 240,0 Z" fill="#1e5fd6" opacity="0.55"/>
@@ -550,7 +512,7 @@
       <path d="M0,300 V150 C50,152 55,225 120,213 C170,204 160,272 110,277 C70,281 75,300 75,300 Z" fill="#1e5fd6" opacity="0.55"/>
       <path d="M0,255 V205 C28,207 32,245 70,240 C100,236 90,268 60,266 Z" fill="#6ea8ff" opacity="0.5"/>
     </svg>
-    <div class="step-title">Type de commande</div>
+    <div class="step-title">BURGER GRILL 76</div>
     <div class="step-sub">Touchez une option pour continuer</div>
     <div class="options" id="opts-type">
       <div class="opt" data-value="Sur place">Sur place</div>
@@ -565,9 +527,12 @@
   <!-- ECRAN 2 : Produit (borne : categories a gauche, produits a droite) -->
   <div class="screen hidden" id="screen-product">
     <div class="step-title">BURGER GRILL 76</div>
-    <div class="kiosk cats-open" id="kiosk">
+    <div class="kiosk" id="kiosk">
       <div class="kiosk-cats" id="kiosk-cats"></div>
-      <div class="kiosk-products"><div class="kiosk-grid" id="kiosk-grid"></div></div>
+      <div class="kiosk-products">
+        <div class="kiosk-brand" id="kiosk-brand"><img src="./logo.png" alt="Burger Grill 76"></div>
+        <div class="kiosk-grid hidden" id="kiosk-grid"></div>
+      </div>
     </div>
     <div class="bottom-bar">
       <button class="btn btn-back" id="product-back">← Retour</button>
@@ -663,6 +628,7 @@
     <div class="step-sub">Cliquez sur un élément pour le basculer en rupture, puis Enregistrer. Les crudités restent toujours disponibles.</div>
     <div class="scroll-wrap" id="stock-list"></div>
     <div class="bottom-bar">
+      <button class="btn btn-back admin-return">← Responsable</button>
       <div class="spacer"></div>
       <button class="btn btn-outline" id="stock-reset">Tout remettre en stock</button>
       <button class="btn btn-blue" id="stock-save">Enregistrer</button>
@@ -721,6 +687,7 @@
     <div class="step-sub" id="history-sub"></div>
     <div class="scroll-wrap" id="history-list"></div>
     <div class="bottom-bar">
+      <button class="btn btn-back admin-return">← Responsable</button>
       <div class="spacer"></div>
       <button class="btn btn-outline" id="history-clear">Vider l'historique</button>
     </div>
@@ -735,6 +702,7 @@
     </div>
     <div class="scroll-wrap" id="recap-list"></div>
     <div class="bottom-bar">
+      <button class="btn btn-back admin-return">← Responsable</button>
       <div class="spacer"></div>
       <button class="btn btn-blue" id="recap-add" style="display:none">➕ Ajouter</button>
       <button class="btn btn-outline" id="recap-clear">Vider ce récap</button>
@@ -806,6 +774,7 @@
       </div>
     </div>
     <div class="bottom-bar">
+      <button class="btn btn-back admin-return">← Responsable</button>
       <div class="spacer"></div>
       <button class="btn btn-blue" id="set-save">Enregistrer</button>
     </div>
@@ -858,7 +827,7 @@ const MENU = [
     { id:"b-special",  name:"Special",     desc:"Steak farci, filet de poulet, pain brioché, lardons, cheddar", sizes:[{label:"150g",price:11.50}], flow:{cuisson:true,sauce:true,crudites:true,extras:true} },
     { id:"b-macchick", name:"Mac Chicken", desc:"Tenders, pain brioché, galette de PDT, cheddar", price:9.50, flow:{sauce:true,crudites:true,extras:true} },
   ]},
-  { title: "Tacos des Chefs", items: [
+  { title: "Tacos", items: [
     { id:"tacos", name:"Tacos", desc:"Composez votre tacos", category:"tacos",
       sizes:[
         {label:"M — 1 viande",price:7.50,viandes:1},
@@ -1372,7 +1341,7 @@ function groupKey(a){
           a.crudites.slice().sort().join(','), a.extras.slice().sort().join(',')].join('|');
 }
 
-const SIDE_SCREENS = { 'screen-stock': 'stock', 'screen-history': 'history', 'screen-recap': 'recap', 'screen-settings': 'settings' };
+const SIDE_SCREENS = { 'screen-stock': 'stock', 'screen-history': 'history', 'screen-recap': 'recap', 'screen-settings': 'settings', 'screen-admin': 'order' };
 function showScreen(id){
   // Applique une MAJ en attente quand on revient à l'écran d'accueil (jamais en pleine commande)
   if (id === 'screen-type' && swUpdateReady && !swRefreshing) { swRefreshing = true; location.reload(); return; }
@@ -1380,6 +1349,8 @@ function showScreen(id){
   document.getElementById(id).classList.remove('hidden');
   if (!SIDE_SCREENS[id]) currentOrderScreen = id;   // on ne mémorise pas les écrans annexes comme écran de commande
   setActiveNav(SIDE_SCREENS[id] || 'order');
+  // Le bouton Responsable ne sert à rien quand on est déjà dans son espace
+  document.getElementById('btn-resp').classList.toggle('hidden', !!SIDE_SCREENS[id]);
 }
 function setActiveNav(which){
   document.getElementById('nav-order').classList.toggle('active', which === 'order');
@@ -1398,23 +1369,20 @@ function updateCart(){
   document.getElementById('cartInfo').textContent = t;
 }
 
-// ===================== ECRAN D'ACCUEIL =====================
-// Toute la surface est tactile : un appui lance la prise de commande.
-document.getElementById('screen-splash').addEventListener('click', () => showScreen('screen-type'));
-
 // ===================== ECRAN TYPE =====================
 document.querySelectorAll('#opts-type .opt').forEach(opt => {
   opt.addEventListener('click', () => {
     order.type = opt.dataset.value;
     updateCart();
+    buildProductList();             // on repart sur le logo, stock à jour
     showScreen('screen-product');   // on avance directement, pas besoin de "Suivant"
   });
 });
-document.getElementById('next-type').addEventListener('click', () => { if (order.type) { updateCart(); showScreen('screen-product'); } });
+document.getElementById('next-type').addEventListener('click', () => { if (order.type) { updateCart(); buildProductList(); showScreen('screen-product'); } });
 
 // ===================== ECRAN PRODUIT (borne) =====================
 const CAT_EMOJI = {
-  'Nos Sandwichs': '🥙', 'Nos Burgers Maison': '🍔', 'Tacos des Chefs': '🌮',
+  'Nos Sandwichs': '🥙', 'Nos Burgers Maison': '🍔', 'Tacos': '🌮',
   'Nos Assiettes': '🍽️', 'Nos Maxi Galettes': '🫓',
   'Nos Tex Mex': '🌶️', 'Poutine': '🥣', 'Menu Enfant': '🧒', 'Frites': '🍟'
 };
@@ -1474,7 +1442,7 @@ function renderProductGrid(cat, grid){
 }
 
 // Catégorie affichée dans la colonne de droite
-let activeCatIndex = 0;
+let activeCatIndex = null;   // null = aucune catégorie choisie, on affiche le logo
 
 // Colonne de gauche : une case par catégorie (comme sur une borne)
 function buildCatColumn(){
@@ -1489,33 +1457,25 @@ function buildCatColumn(){
   });
 }
 
-// Catégorie touchée : la liste des catégories s'efface, les produits prennent toute la place
+// Catégorie touchée : ses produits remplacent le logo dans la zone de droite
 function selectCategory(i){
   activeCatIndex = i;
-  const cat = MENU[i];
   [...document.getElementById('kiosk-cats').children].forEach((el, k) => el.classList.toggle('active', k === i));
-  renderProductGrid(cat, document.getElementById('kiosk-grid'));
-  document.getElementById('kiosk').classList.remove('cats-open');
+  renderProductGrid(MENU[i], document.getElementById('kiosk-grid'));
+  document.getElementById('kiosk-brand').classList.add('hidden');
+  document.getElementById('kiosk-grid').classList.remove('hidden');
   document.querySelector('.kiosk-products').scrollTop = 0;
 }
 
-// Retour à la liste des catégories (en cas d'erreur de choix)
-function showCategories(){
-  document.getElementById('kiosk').classList.add('cats-open');
-  document.getElementById('kiosk-cats').scrollTop = 0;
-}
-
 function buildProductList(){
+  activeCatIndex = null;
   buildCatColumn();
-  renderProductGrid(MENU[activeCatIndex], document.getElementById('kiosk-grid'));
-  showCategories();   // on arrive toujours sur la liste des catégories
+  document.getElementById('kiosk-grid').innerHTML = '';
+  document.getElementById('kiosk-grid').classList.add('hidden');
+  document.getElementById('kiosk-brand').classList.remove('hidden');   // on repart sur le logo
 }
 
-// En bas : si on voit les produits, on remonte aux catégories ; sinon on quitte l'écran
-document.getElementById('product-back').addEventListener('click', () => {
-  if (document.getElementById('kiosk').classList.contains('cats-open')) showScreen('screen-type');
-  else showCategories();
-});
+document.getElementById('product-back').addEventListener('click', () => showScreen('screen-type'));
 
 // ===================== COMPOSITION D'UN ARTICLE =====================
 // presetSize : taille déjà choisie dans la grille (Tacos, Frites) — on saute l'étape « taille »
@@ -2285,7 +2245,7 @@ document.getElementById('btn-nouvelle').addEventListener('click', () => {
   art = null; flow = []; stepIndex = 0; selectedProductId = null;
   document.querySelectorAll('#opts-type .opt').forEach(o => o.classList.remove('selected'));
   document.getElementById('next-type').disabled = true;
-  activeCatIndex = 0;
+  activeCatIndex = null;
   buildProductList();
   updateCart();
   showScreen('screen-type');
@@ -2376,6 +2336,27 @@ document.getElementById('nav-stock').addEventListener('click', () => { openStock
 document.getElementById('nav-history').addEventListener('click', () => { openHistory(); closeMenu(); });
 document.getElementById('nav-recap').addEventListener('click', () => { openRecap(); closeMenu(); });
 document.getElementById('nav-settings').addEventListener('click', () => { openSettings(); closeMenu(); });
+
+// ===================== ESPACE RESPONSABLE =====================
+// Bouton en haut à droite : code 2006, puis la page qui regroupe tout ce qui est
+// retiré de la vue client (stock, récap, historique, paramètres).
+document.getElementById('btn-resp').addEventListener('click', () => {
+  askDeleteCode(() => showScreen('screen-admin'), 'Entrez le code responsable');
+});
+
+document.querySelectorAll('.admin-tile').forEach(tile => {
+  tile.addEventListener('click', () => {
+    const go = tile.dataset.go;
+    if (go === 'stock')         openStock();
+    else if (go === 'recap')    openRecap();
+    else if (go === 'history')  openHistory();
+    else if (go === 'settings') openSettings();
+  });
+});
+
+// Chaque page de l'espace responsable revient à la liste
+document.querySelectorAll('.admin-return').forEach(b => b.addEventListener('click', () => showScreen('screen-admin')));
+document.getElementById('admin-back').addEventListener('click', () => showScreen(currentOrderScreen || 'screen-type'));
 
 // ===================== ECRAN PARAMETRES =====================
 function fillSettingsFields(){

@@ -1,7 +1,7 @@
 // Service worker — Burger Grill 76 Caisse
 // Permet l'installation en application et le fonctionnement hors-ligne.
-const CACHE = 'bg76-v32';
-const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png'];
+const CACHE = 'bg76-v36';
+const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-180.png', './logo.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
