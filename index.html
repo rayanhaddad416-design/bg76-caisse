@@ -24,7 +24,9 @@
 
   body {
     background: #f4f5f7;
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;      /* hauteur reelle sur mobile (barre d'adresse comprise) */
+    overflow: hidden;    /* la page ne defile jamais : seules les zones internes defilent */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -35,13 +37,14 @@
     width: 100%;
     max-width: 1100px;
   }
+  /* Bouton menu : invisible a l'ecran, mais toujours cliquable en haut a gauche */
   .menu-toggle {
-    position: absolute; top: 14px; left: 18px; z-index: 25;
-    width: 46px; height: 40px; border: none; border-radius: 9px;
-    background: #0637c8; color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+    position: absolute; top: 0; left: 0; z-index: 25;
+    width: 58px; height: 52px; border: none; padding: 0;
+    background: transparent; color: transparent; font-size: 0; cursor: default;
+    -webkit-tap-highlight-color: transparent;
   }
-  .menu-toggle:hover { background: #052ba0; }
+  .menu-toggle:focus { outline: none; }
   .menu {
     position: absolute; top: 62px; left: 18px; z-index: 24;
     background: #fff; border-radius: 12px; box-shadow: 0 8px 26px rgba(0,0,0,0.22);
@@ -62,7 +65,7 @@
     background: #ffffff;
     width: 100%;
     max-width: 1100px;
-    height: min(800px, calc(100vh - 44px));   /* remplit l'écran sans déborder (tablette paysage) */
+    height: min(800px, calc(100dvh - 40px));   /* remplit l'écran sans déborder (tablette paysage) */
     border-radius: 6px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.08);
     padding: 40px 50px 30px;
@@ -152,6 +155,43 @@
     color: #0637c8; background: #eef2ff; border-radius: 20px; padding: 2px 10px;
   }
   .opt.selected .price-badge { color: #fff; background: rgba(255,255,255,0.22); }
+
+  /* ===== Ecran commande facon borne : colonne de categories + grille de produits ===== */
+  .kiosk { flex: 1; min-height: 0; display: flex; gap: 16px; }
+
+  .kiosk-cats {
+    width: 158px; flex-shrink: 0; min-height: 0;
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; gap: 9px;
+    padding: 2px 6px 10px 2px; border-right: 2px solid #eef0f5;
+  }
+  .kcat {
+    border: 2px solid #e2e6f0; border-radius: 12px; background: #fff;
+    padding: 13px 7px; cursor: pointer; text-align: center; user-select: none;
+    font-size: 13.5px; font-weight: 700; line-height: 1.25; color: #333;
+    transition: all 0.12s ease;
+  }
+  .kcat:hover { background: #f0f4ff; }
+  .kcat.active { background: #0637c8; border-color: #0637c8; color: #fff; }
+  .kcat-ic { display: block; font-size: 27px; margin-bottom: 6px; line-height: 1; }
+
+  .kiosk-products {
+    flex: 1; min-height: 0;
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    padding: 2px 4px 10px;
+  }
+  .kiosk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 13px; }
+
+  /* Barres de défilement fines et discrètes dans les deux colonnes */
+  .kiosk-cats::-webkit-scrollbar, .kiosk-products::-webkit-scrollbar { width: 7px; }
+  .kiosk-cats::-webkit-scrollbar-thumb, .kiosk-products::-webkit-scrollbar-thumb {
+    background: #c9d2e6; border-radius: 10px;
+  }
+  .kiosk-cats, .kiosk-products { scrollbar-width: thin; scrollbar-color: #c9d2e6 transparent; }
+
+  /* En-tete compact : on laisse la place aux produits */
+  #screen-product .step-title { font-size: 23px; margin-bottom: 2px; }
+  #screen-product .step-sub { margin-bottom: 12px; }
 
   .bottom-bar { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-top: 22px; }
   .bottom-bar .spacer { flex: 1; }
@@ -382,9 +422,17 @@
   .thanks .recap { max-width: 620px; }
 
   @media (max-width: 760px) {
-    .card { padding: 26px 18px; height: auto; min-height: 620px; }
+    body { padding: 8px; }
+    /* hauteur fixe aussi sur petit écran : sinon c'est la page entière qui défile
+       au lieu des deux colonnes */
+    .card { padding: 18px 12px 14px; height: calc(100dvh - 16px); }
     .options { gap: 18px; }
     .opt { min-width: 140px; padding: 24px 14px; font-size: 20px; }
+    .kiosk { gap: 10px; }
+    .kiosk-cats { width: 104px; gap: 7px; }
+    .kcat { font-size: 11.5px; padding: 10px 4px; }
+    .kcat-ic { font-size: 22px; margin-bottom: 4px; }
+    .kiosk-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
   }
 </style>
 </head>
@@ -394,11 +442,12 @@
   <div class="card">
   <button class="menu-toggle" id="menuToggle" aria-label="Menu">☰</button>
   <nav class="menu hidden" id="menu">
-    <div class="menu-brand">🍔 Burger Grill 76</div>
+    <div class="menu-brand" id="menu-brand">🍔 Burger Grill 76</div>
     <button class="nav-btn active" id="nav-order"><span class="nav-ic">🧾</span> Commande</button>
     <button class="nav-btn" id="nav-stock"><span class="nav-ic">📦</span> Stock</button>
-    <button class="nav-btn" id="nav-history"><span class="nav-ic">🕘</span> Historique</button>
-    <button class="nav-btn" id="nav-recap"><span class="nav-ic">📊</span> Récap</button>
+    <!-- Historique et Récap : masqués par défaut, révélés par appui long sur le titre du menu -->
+    <button class="nav-btn hidden" id="nav-history"><span class="nav-ic">🕘</span> Historique</button>
+    <button class="nav-btn hidden" id="nav-recap"><span class="nav-ic">📊</span> Récap</button>
     <button class="nav-btn" id="nav-settings"><span class="nav-ic">⚙️</span> Paramètres</button>
   </nav>
   <div class="cart-info" id="cartInfo"></div>
@@ -428,25 +477,17 @@
     </div>
   </div>
 
-  <!-- ECRAN 2 : Produit -->
+  <!-- ECRAN 2 : Produit (borne : categories a gauche, produits a droite) -->
   <div class="screen hidden" id="screen-product">
     <div class="step-title">Choisissez un produit</div>
-    <div class="step-sub">Sandwichs & burgers servis avec crudités et frites maison</div>
-    <div class="scroll-wrap" id="product-list"></div>
+    <div class="step-sub" id="product-sub"></div>
+    <div class="kiosk">
+      <div class="kiosk-cats" id="kiosk-cats"></div>
+      <div class="kiosk-products"><div class="kiosk-grid" id="kiosk-grid"></div></div>
+    </div>
     <div class="bottom-bar">
       <button class="btn btn-back" id="product-back">← Retour</button>
       <div class="spacer"></div>
-      <button class="btn btn-blue" id="product-next" disabled style="display:none">Suivant</button>
-    </div>
-  </div>
-
-  <!-- ECRAN 2b : Produits d'une catégorie -->
-  <div class="screen hidden" id="screen-category">
-    <div class="step-title" id="category-title">Catégorie</div>
-    <div class="step-sub">Touchez un produit</div>
-    <div class="scroll-wrap"><div class="grid cat-grid" id="category-list"></div></div>
-    <div class="bottom-bar">
-      <button class="btn btn-back" id="category-back">← Retour</button>
     </div>
   </div>
 
@@ -1283,9 +1324,7 @@ document.querySelectorAll('#opts-type .opt').forEach(opt => {
 });
 document.getElementById('next-type').addEventListener('click', () => { if (order.type) { updateCart(); showScreen('screen-product'); } });
 
-// ===================== ECRAN PRODUIT =====================
-// Catégories laissées en accordéon direct sur l'écran produit (les autres ouvrent une page)
-const INLINE_CATS = new Set(['Nos Tex Mex', 'Poutine', 'Menu Enfant', 'Frites']);
+// ===================== ECRAN PRODUIT (borne) =====================
 const CAT_EMOJI = {
   'Nos Sandwichs': '🥙', 'Nos Burgers Maison': '🍔', 'Tacos des Chefs': '🌮',
   'Nos Assiettes': '🍽️', 'Nos Maxi Galettes': '🫓',
@@ -1314,54 +1353,39 @@ function renderProductGrid(cat, grid){
   });
 }
 
+// Catégorie affichée dans la colonne de droite
+let activeCatIndex = 0;
+
+// Colonne de gauche : une case par catégorie (comme sur une borne)
+function buildCatColumn(){
+  const col = document.getElementById('kiosk-cats');
+  col.innerHTML = '';
+  MENU.forEach((cat, i) => {
+    const btn = document.createElement('div');
+    btn.className = 'kcat' + (i === activeCatIndex ? ' active' : '');
+    btn.innerHTML = '<span class="kcat-ic">' + (CAT_EMOJI[cat.title] || '🍴') + '</span>' + cat.title;
+    btn.addEventListener('click', () => selectCategory(i));
+    col.appendChild(btn);
+  });
+}
+
+// Affiche les produits de la catégorie choisie dans la zone de droite
+function selectCategory(i){
+  activeCatIndex = i;
+  const cat = MENU[i];
+  [...document.getElementById('kiosk-cats').children].forEach((el, k) => el.classList.toggle('active', k === i));
+  document.getElementById('product-sub').textContent = cat.title;
+  const grid = document.getElementById('kiosk-grid');
+  renderProductGrid(cat, grid);
+  document.querySelector('.kiosk-products').scrollTop = 0;
+}
+
 function buildProductList(){
-  const wrap = document.getElementById('product-list');
-  wrap.innerHTML = '';
-  // Grosses catégories : boutons-onglets (style Récap) qui ouvrent une page dédiée
-  const tabs = document.createElement('div');
-  tabs.className = 'cat-tabs';
-  MENU.forEach(cat => {
-    if (INLINE_CATS.has(cat.title)) return;
-    const btn = document.createElement('button');
-    btn.className = 'rtab cat-tab';
-    btn.innerHTML = (CAT_EMOJI[cat.title] || '🍴') + ' ' + cat.title;
-    btn.addEventListener('click', () => openCategory(cat));
-    tabs.appendChild(btn);
-  });
-  wrap.appendChild(tabs);
-  // Petites catégories : accordéon dépliable directement sur l'écran
-  MENU.forEach(cat => {
-    if (!INLINE_CATS.has(cat.title)) return;
-    const header = document.createElement('button');
-    header.className = 'cat-header';
-    header.innerHTML = '<span class="chevron">▸</span><span>' + (CAT_EMOJI[cat.title] || '') + ' ' + cat.title + '</span>';
-    const grid = document.createElement('div');
-    grid.className = 'grid cat-grid hidden';
-    renderProductGrid(cat, grid);
-    header.addEventListener('click', () => {
-      const willOpen = grid.classList.contains('hidden');
-      grid.classList.toggle('hidden', !willOpen);
-      header.classList.toggle('open', willOpen);
-      header.querySelector('.chevron').textContent = willOpen ? '▾' : '▸';
-    });
-    wrap.appendChild(header);
-    wrap.appendChild(grid);
-  });
+  buildCatColumn();
+  selectCategory(activeCatIndex);
 }
 
-// Ouvre la page listant tous les produits d'une catégorie
-function openCategory(cat){
-  document.getElementById('category-title').textContent = cat.title;
-  renderProductGrid(cat, document.getElementById('category-list'));
-  showScreen('screen-category');
-}
-
-document.getElementById('category-back').addEventListener('click', () => showScreen('screen-product'));
 document.getElementById('product-back').addEventListener('click', () => showScreen('screen-type'));
-document.getElementById('product-next').addEventListener('click', () => {
-  if (!selectedProductId) return;
-  startArticle(findItem(selectedProductId));
-});
 
 // ===================== COMPOSITION D'UN ARTICLE =====================
 function startArticle(item){
@@ -1690,7 +1714,7 @@ function updateConfirmNote(){
 
 document.getElementById('btn-ajouter').addEventListener('click', () => {
   selectedProductId = null;
-  document.querySelectorAll('#product-list .opt').forEach(o => o.classList.remove('selected'));
+  buildProductList();          // on revient sur la borne, stock et catégorie à jour
   showScreen('screen-product');
 });
 
@@ -2129,8 +2153,8 @@ document.getElementById('btn-nouvelle').addEventListener('click', () => {
   art = null; flow = []; stepIndex = 0; selectedProductId = null;
   document.querySelectorAll('#opts-type .opt').forEach(o => o.classList.remove('selected'));
   document.getElementById('next-type').disabled = true;
-  document.getElementById('product-next').disabled = true;
-  document.querySelectorAll('#product-list .opt').forEach(o => o.classList.remove('selected'));
+  activeCatIndex = 0;
+  buildProductList();
   updateCart();
   showScreen('screen-type');
 });
@@ -2181,7 +2205,10 @@ function showToast(text){
 }
 
 // Menu hamburger : caché tant qu'on n'a pas cliqué sur les trois traits
-function closeMenu(){ document.getElementById('menu').classList.add('hidden'); }
+function closeMenu(){
+  document.getElementById('menu').classList.add('hidden');
+  hideSecretNav();   // Historique / Récap redeviennent invisibles
+}
 document.getElementById('menuToggle').addEventListener('click', (e) => {
   e.stopPropagation();
   document.getElementById('menu').classList.toggle('hidden');
@@ -2192,6 +2219,25 @@ document.addEventListener('click', (e) => {
     closeMenu();
   }
 });
+
+// Historique et Récap : retirés du menu. Appui long (2 s) sur "🍔 Burger Grill 76" pour les faire apparaître.
+let brandTimer = null;
+function hideSecretNav(){
+  document.getElementById('nav-history').classList.add('hidden');
+  document.getElementById('nav-recap').classList.add('hidden');
+}
+function showSecretNav(){
+  document.getElementById('nav-history').classList.remove('hidden');
+  document.getElementById('nav-recap').classList.remove('hidden');
+  showToast('Historique et Récap affichés');
+}
+const brandEl = document.getElementById('menu-brand');
+brandEl.addEventListener('pointerdown', () => {
+  clearTimeout(brandTimer);
+  brandTimer = setTimeout(showSecretNav, 2000);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev =>
+  brandEl.addEventListener(ev, () => clearTimeout(brandTimer)));
 
 document.getElementById('nav-order').addEventListener('click', () => { showScreen('screen-type'); closeMenu(); });
 document.getElementById('nav-stock').addEventListener('click', () => { openStock(); closeMenu(); });
