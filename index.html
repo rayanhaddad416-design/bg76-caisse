@@ -182,6 +182,10 @@
   }
   .kiosk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 13px; }
 
+  /* Categorie choisie : la colonne s'efface, les produits prennent toute la largeur.
+     Le bouton "Retour" en bas la fait revenir. */
+  .kiosk.cat-open .kiosk-cats { display: none; }
+
   /* Tant qu'aucune categorie n'est choisie, le logo occupe la zone des produits */
   .kiosk-brand {
     min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px;
@@ -1457,25 +1461,33 @@ function buildCatColumn(){
   });
 }
 
-// Catégorie touchée : ses produits remplacent le logo dans la zone de droite
+// Catégorie touchée : la colonne de gauche s'efface, ses produits prennent toute la largeur
 function selectCategory(i){
   activeCatIndex = i;
   [...document.getElementById('kiosk-cats').children].forEach((el, k) => el.classList.toggle('active', k === i));
   renderProductGrid(MENU[i], document.getElementById('kiosk-grid'));
   document.getElementById('kiosk-brand').classList.add('hidden');
   document.getElementById('kiosk-grid').classList.remove('hidden');
+  document.getElementById('kiosk').classList.add('cat-open');
   document.querySelector('.kiosk-products').scrollTop = 0;
 }
 
+// Etat de départ : la colonne à gauche, le logo à droite
 function buildProductList(){
   activeCatIndex = null;
   buildCatColumn();
   document.getElementById('kiosk-grid').innerHTML = '';
   document.getElementById('kiosk-grid').classList.add('hidden');
-  document.getElementById('kiosk-brand').classList.remove('hidden');   // on repart sur le logo
+  document.getElementById('kiosk-brand').classList.remove('hidden');
+  document.getElementById('kiosk').classList.remove('cat-open');
+  document.getElementById('kiosk-cats').scrollTop = 0;
 }
 
-document.getElementById('product-back').addEventListener('click', () => showScreen('screen-type'));
+// En bas : si on est dans une catégorie, on ramène la colonne ; sinon on quitte l'écran
+document.getElementById('product-back').addEventListener('click', () => {
+  if (document.getElementById('kiosk').classList.contains('cat-open')) buildProductList();
+  else showScreen('screen-type');
+});
 
 // ===================== COMPOSITION D'UN ARTICLE =====================
 // presetSize : taille déjà choisie dans la grille (Tacos, Frites) — on saute l'étape « taille »
