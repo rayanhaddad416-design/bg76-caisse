@@ -182,6 +182,8 @@
   .kcat:hover { background: #f0f4ff; }
   .kcat.active { background: #0637c8; border-color: #0637c8; color: #fff; }
   .kcat-ic { display: block; font-size: 27px; margin-bottom: 6px; line-height: 1; }
+  /* Categorie illustree par une vraie image plutot qu'un emoji */
+  .kcat-img { display: block; height: 52px; width: auto; max-width: 100%; margin: 0 auto 5px; object-fit: contain; pointer-events: none; }
 
   .kiosk-products {
     flex: 1; min-height: 0;
@@ -1420,6 +1422,11 @@ document.querySelectorAll('#opts-type .opt').forEach(opt => {
 document.getElementById('next-type').addEventListener('click', () => { if (order.type) { updateCart(); buildProductList(); showScreen('screen-product'); } });
 
 // ===================== ECRAN PRODUIT (borne) =====================
+// Categories illustrees par une image (les autres gardent leur emoji)
+const CAT_IMG = {
+  'Nos Burgers Maison': 'photos/cat-burgers.webp'
+};
+
 const CAT_EMOJI = {
   'Nos Sandwichs': '🥙', 'Nos Burgers Maison': '🍔', 'Tacos': '🌮',
   'Nos Assiettes': '🍽️', 'Nos Maxi Galettes': '🫓',
@@ -1509,7 +1516,10 @@ function buildCatColumn(){
   MENU.forEach((cat, i) => {
     const btn = document.createElement('div');
     btn.className = 'kcat' + (i === activeCatIndex ? ' active' : '');
-    btn.innerHTML = '<span class="kcat-ic">' + (CAT_EMOJI[cat.title] || '🍴') + '</span>' + cat.title;
+    btn.innerHTML = (CAT_IMG[cat.title]
+        ? '<img class="kcat-img" src="' + CAT_IMG[cat.title] + '" alt="" draggable="false">'
+        : '<span class="kcat-ic">' + (CAT_EMOJI[cat.title] || '🍴') + '</span>')
+      + cat.title;
     btn.addEventListener('click', () => selectCategory(i));
     col.appendChild(btn);
   });
