@@ -180,10 +180,6 @@
     letter-spacing: 1px; line-height: 1.15; text-shadow: 0 2px 14px rgba(0,0,0,0.6);
   }
   .splash-hero p { color: #d8d4cc; font-size: clamp(13px, 2.2vh, 19px); }
-  .splash-logo {
-    width: clamp(100px, 24vh, 200px); height: auto; margin-top: 6px;
-    border-radius: 22px; box-shadow: 0 10px 34px rgba(0,0,0,0.6);
-  }
 
   .splash-pay {
     flex-shrink: 0; background: #14110e; display: flex; flex-wrap: wrap;
@@ -228,6 +224,19 @@
     padding: 2px 4px 10px;
   }
   .kiosk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 13px; }
+
+  /* Deux temps : d'abord les categories en plein ecran, puis les produits seuls.
+     Le bouton "Retour" en bas ramene les categories. */
+  .kiosk.cats-open .kiosk-products { display: none; }
+  .kiosk.cats-open .kiosk-cats {
+    width: 100%; flex: 1; border-right: none; padding: 2px 4px 10px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+    gap: 14px; align-content: start;
+  }
+  .kiosk.cats-open .kcat { padding: 26px 10px; font-size: 16.5px; }
+  .kiosk.cats-open .kcat-ic { font-size: 40px; margin-bottom: 10px; }
+  .kiosk.cats-open .kcat.active { background: #fff; border-color: #e2e6f0; color: #333; }
+  .kiosk:not(.cats-open) .kiosk-cats { display: none; }
 
   /* Barres de défilement fines et discrètes dans les deux colonnes */
   .kiosk-cats::-webkit-scrollbar, .kiosk-products::-webkit-scrollbar { width: 7px; }
@@ -505,7 +514,6 @@
     <div class="splash-hero">
       <h1>NOS CRÉATIONS SIGNATURE</h1>
       <p>Découvrez nos saveurs uniques</p>
-      <img class="splash-logo" src="./icon-512.png" alt="Burger Grill 76">
     </div>
     <div class="splash-pay">
       <div class="pay-mark" title="Sans contact">
@@ -557,7 +565,7 @@
   <!-- ECRAN 2 : Produit (borne : categories a gauche, produits a droite) -->
   <div class="screen hidden" id="screen-product">
     <div class="step-title">BURGER GRILL 76</div>
-    <div class="kiosk">
+    <div class="kiosk cats-open" id="kiosk">
       <div class="kiosk-cats" id="kiosk-cats"></div>
       <div class="kiosk-products"><div class="kiosk-grid" id="kiosk-grid"></div></div>
     </div>
@@ -1411,9 +1419,41 @@ const CAT_EMOJI = {
   'Nos Tex Mex': '🌶️', 'Poutine': '🥣', 'Menu Enfant': '🧒', 'Frites': '🍟'
 };
 
-// Remplit une grille avec les produits d'une catégorie (partagé accordéon + sous-page)
+// Une catégorie qui ne contient qu'un produit décliné en tailles (Tacos, Frites) :
+// on montre directement une case par taille, sans passer par une étape de plus.
+function isSizeOnlyCategory(cat){
+  return cat.items.length === 1 && cat.items[0].sizes && cat.items[0].sizes.length > 1;
+}
+
+// "M — 1 viande" -> { titre: "Tacos M", desc: "1 viande" } ; "Moyenne" -> { titre: "Frites Moyenne" }
+function sizeCardLabels(item, size){
+  const parts = size.label.split('—');
+  if (parts.length > 1) return { titre: item.name + ' ' + parts[0].trim(), desc: parts.slice(1).join('—').trim() };
+  return { titre: item.name + ' ' + size.label.trim(), desc: item.desc || '' };
+}
+
+function renderSizeGrid(cat, grid){
+  const item = cat.items[0];
+  const available = isProductAvailable(item);
+  item.sizes.forEach(size => {
+    const l = sizeCardLabels(item, size);
+    const el = document.createElement('div');
+    el.className = 'opt opt-sm' + (available ? '' : ' out');
+    el.innerHTML = l.titre
+      + (l.desc ? '<div class="desc">' + l.desc + '</div>' : '')
+      + (available ? '<div class="price-badge">' + euro(size.price) + '</div>'
+                   : '<div class="out-badge">Plus en stock</div>');
+    if (available) {
+      el.addEventListener('click', () => { selectedProductId = item.id; startArticle(item, size); });
+    }
+    grid.appendChild(el);
+  });
+}
+
+// Remplit une grille avec les produits d'une catégorie
 function renderProductGrid(cat, grid){
   grid.innerHTML = '';
+  if (isSizeOnlyCategory(cat)) { renderSizeGrid(cat, grid); return; }
   cat.items.forEach(item => {
     const el = document.createElement('div');
     el.dataset.id = item.id;
@@ -1449,28 +1489,40 @@ function buildCatColumn(){
   });
 }
 
-// Affiche les produits de la catégorie choisie dans la zone de droite
+// Catégorie touchée : la liste des catégories s'efface, les produits prennent toute la place
 function selectCategory(i){
   activeCatIndex = i;
   const cat = MENU[i];
   [...document.getElementById('kiosk-cats').children].forEach((el, k) => el.classList.toggle('active', k === i));
-  const grid = document.getElementById('kiosk-grid');
-  renderProductGrid(cat, grid);
+  renderProductGrid(cat, document.getElementById('kiosk-grid'));
+  document.getElementById('kiosk').classList.remove('cats-open');
   document.querySelector('.kiosk-products').scrollTop = 0;
+}
+
+// Retour à la liste des catégories (en cas d'erreur de choix)
+function showCategories(){
+  document.getElementById('kiosk').classList.add('cats-open');
+  document.getElementById('kiosk-cats').scrollTop = 0;
 }
 
 function buildProductList(){
   buildCatColumn();
-  selectCategory(activeCatIndex);
+  renderProductGrid(MENU[activeCatIndex], document.getElementById('kiosk-grid'));
+  showCategories();   // on arrive toujours sur la liste des catégories
 }
 
-document.getElementById('product-back').addEventListener('click', () => showScreen('screen-type'));
+// En bas : si on voit les produits, on remonte aux catégories ; sinon on quitte l'écran
+document.getElementById('product-back').addEventListener('click', () => {
+  if (document.getElementById('kiosk').classList.contains('cats-open')) showScreen('screen-type');
+  else showCategories();
+});
 
 // ===================== COMPOSITION D'UN ARTICLE =====================
-function startArticle(item){
+// presetSize : taille déjà choisie dans la grille (Tacos, Frites) — on saute l'étape « taille »
+function startArticle(item, presetSize){
   art = {
     item,
-    size: item.sizes ? item.sizes[0] : null,
+    size: presetSize || (item.sizes ? item.sizes[0] : null),
     viandes: [],
     cuisson: null,
     pain: null,
@@ -1479,6 +1531,7 @@ function startArticle(item){
     extras: []
   };
   flow = computeFlow(item);
+  if (presetSize) flow = flow.filter(k => k !== 'size');   // la taille vient d'être choisie
   stepIndex = 0;
   if (flow.length) { renderStep(); showScreen('screen-step'); }
   else showConfirm();
