@@ -182,6 +182,21 @@
   }
   .kiosk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 13px; }
 
+  /* Cartes produits : cadre doux au lieu du rectangle noir */
+  .kiosk-grid .opt {
+    border: 2px solid #e8ebf2; box-shadow: 0 2px 9px rgba(0,0,0,0.05);
+    /* les cartes sans photo partagent la hauteur d'une rangee avec photo : on centre */
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .kiosk-grid .opt:hover { border-color: #0637c8; background: #fff; }
+  .kiosk-grid .opt.out { border-color: #e4e4e4; box-shadow: none; }
+
+  /* Photo du produit : fond blanc des photos = fond blanc de la carte,
+     on garde l'image entiere (pas de recadrage) */
+  .opt-photo { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: contain; margin-bottom: 4px; }
+  .kiosk-grid .opt.with-photo { padding-top: 10px; }
+  .opt.out .opt-photo { filter: grayscale(1); opacity: 0.45; }
+
   /* Categorie choisie : la colonne s'efface, les produits prennent toute la largeur.
      Le bouton "Retour" en bas la fait revenir. */
   .kiosk.cat-open .kiosk-cats { display: none; }
@@ -1391,6 +1406,24 @@ const CAT_EMOJI = {
   'Nos Tex Mex': '🌶️', 'Poutine': '🥣', 'Menu Enfant': '🧒', 'Frites': '🍟'
 };
 
+// Photos des produits (dossier photos/), associées par identifiant.
+// Tous les produits n'en ont pas encore : ceux qui manquent gardent la carte sans image.
+// Attention : 'b-boursin' est le BURGER Boursin, pas le sandwich 'boursin-s' du même nom.
+const PHOTOS = {
+  'b-cheddar':  'photos/b-cheddar.jpg',
+  'b-eggs':     'photos/b-eggs.jpg',
+  'b-boursin':  'photos/b-boursin.jpg',
+  'b-raclette': 'photos/b-raclette.jpg',
+  'b-mexicain': 'photos/b-mexicain.jpg',
+  'b-broster':  'photos/b-broster.jpg',
+  'b-master':   'photos/b-master.jpg',
+  'b-farci':    'photos/b-farci.jpg',
+  'b-bigbacon': 'photos/b-bigbacon.jpg',
+  'b-french':   'photos/b-french.jpg',
+  'b-special':  'photos/b-special.jpg',
+  'b-macchick': 'photos/b-macchick.jpg'
+};
+
 // Une catégorie qui ne contient qu'un produit décliné en tailles (Tacos, Frites) :
 // on montre directement une case par taille, sans passer par une étape de plus.
 function isSizeOnlyCategory(cat){
@@ -1433,8 +1466,9 @@ function renderProductGrid(cat, grid){
     let priceHint = item.sizes
       ? (item.sizes.length > 1 ? 'dès ' + euro(item.sizes[0].price) : euro(item.sizes[0].price))
       : euro(item.price);
-    el.className = 'opt opt-sm' + (available ? '' : ' out');
-    el.innerHTML = item.name
+    el.className = 'opt opt-sm' + (available ? '' : ' out') + (PHOTOS[item.id] ? ' with-photo' : '');
+    el.innerHTML = (PHOTOS[item.id] ? '<img class="opt-photo" src="' + PHOTOS[item.id] + '" alt="">' : '')
+      + item.name
       + (item.desc ? '<div class="desc">' + item.desc + '</div>' : '')
       + (available ? '<div class="price-badge">' + priceHint + '</div>'
                    : '<div class="out-badge">Plus en stock</div>');
