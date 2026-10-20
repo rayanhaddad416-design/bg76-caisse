@@ -156,6 +156,53 @@
   }
   .opt.selected .price-badge { color: #fff; background: rgba(255,255,255,0.22); }
 
+  /* ===== Ecran d'accueil (attente client) ===== */
+  #screen-splash {
+    position: absolute; inset: 0; z-index: 30; overflow: hidden;
+    background: #000; cursor: pointer; user-select: none;
+  }
+  .splash-top { flex-shrink: 0; background: #f4f0e6; color: #14110e; text-align: center; padding: 16px 10px; }
+  .splash-brand {
+    font-family: Georgia, 'Times New Roman', serif; line-height: 1;
+    font-size: clamp(32px, 7vh, 60px); font-weight: 700; letter-spacing: 4px;
+  }
+  .splash-hero {
+    flex: 1; min-height: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    padding: 20px 18px; text-align: center;
+    /* si tu deposes une photo "splash.jpg" dans le dossier, elle s'affiche ici */
+    background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.75)), url('./splash.jpg'),
+                radial-gradient(circle at 50% 42%, #2b2b2b 0%, #0b0b0b 72%);
+    background-size: cover; background-position: center; background-repeat: no-repeat;
+  }
+  .splash-hero h1 {
+    color: #fff; font-size: clamp(22px, 5vh, 40px); font-weight: 800;
+    letter-spacing: 1px; line-height: 1.15; text-shadow: 0 2px 14px rgba(0,0,0,0.6);
+  }
+  .splash-hero p { color: #d8d4cc; font-size: clamp(13px, 2.2vh, 19px); }
+  .splash-logo {
+    width: clamp(100px, 24vh, 200px); height: auto; margin-top: 6px;
+    border-radius: 22px; box-shadow: 0 10px 34px rgba(0,0,0,0.6);
+  }
+
+  .splash-pay {
+    flex-shrink: 0; background: #14110e; display: flex; flex-wrap: wrap;
+    align-items: center; justify-content: center; gap: clamp(8px, 2.6vw, 28px); padding: 11px 10px;
+  }
+  .pay-mark {
+    background: #fff; border-radius: 7px; height: 36px; padding: 0 11px;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 14px; font-weight: 700; color: #111; white-space: nowrap;
+  }
+  .pay-mark svg { display: block; }
+  .mc-dot { width: 17px; height: 17px; border-radius: 50%; }
+  .mc-left { background: #eb001b; }
+  .mc-right { background: #f79e1b; margin-left: -7px; }
+
+  .splash-start { flex-shrink: 0; background: #2f5d4f; color: #fff; text-align: center; padding: 18px 10px 22px; }
+  .splash-start .s1 { font-size: clamp(20px, 4vh, 33px); font-weight: 700; }
+  .splash-start .s2 { font-size: clamp(12px, 2vh, 18px); opacity: 0.85; margin-top: 3px; }
+
   /* ===== Ecran commande facon borne : colonne de categories + grille de produits ===== */
   .kiosk { flex: 1; min-height: 0; display: flex; gap: 16px; }
 
@@ -190,8 +237,7 @@
   .kiosk-cats, .kiosk-products { scrollbar-width: thin; scrollbar-color: #c9d2e6 transparent; }
 
   /* En-tete compact : on laisse la place aux produits */
-  #screen-product .step-title { font-size: 23px; margin-bottom: 2px; }
-  #screen-product .step-sub { margin-bottom: 12px; }
+  #screen-product .step-title { font-size: 23px; margin-bottom: 14px; letter-spacing: 0.5px; }
 
   .bottom-bar { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-top: 22px; }
   .bottom-bar .spacer { flex: 1; }
@@ -453,8 +499,39 @@
   <div class="cart-info" id="cartInfo"></div>
   <div class="toast hidden" id="toast">✓ Stock enregistré</div>
 
+  <!-- ECRAN 0 : accueil, affiché à l'ouverture de l'application -->
+  <div class="screen" id="screen-splash">
+    <div class="splash-top"><div class="splash-brand">BG.76</div></div>
+    <div class="splash-hero">
+      <h1>NOS CRÉATIONS SIGNATURE</h1>
+      <p>Découvrez nos saveurs uniques</p>
+      <img class="splash-logo" src="./icon-512.png" alt="Burger Grill 76">
+    </div>
+    <div class="splash-pay">
+      <div class="pay-mark" title="Sans contact">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.1" stroke-linecap="round">
+          <path d="M6 5c3.6 3.4 3.6 10.6 0 14"/><path d="M11 3c4.8 4.5 4.8 13.5 0 18"/><path d="M16 1.5c6 5.6 6 15.4 0 21"/>
+        </svg>
+      </div>
+      <div class="pay-mark">Apple&nbsp;Pay</div>
+      <div class="pay-mark"><span style="color:#4285f4">G</span>&nbsp;Pay</div>
+      <div class="pay-mark" title="Mastercard">
+        <span class="mc-dot mc-left"></span><span class="mc-dot mc-right"></span>
+      </div>
+      <div class="pay-mark" title="Carte sans contact">
+        <svg width="22" height="20" viewBox="0 0 26 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round">
+          <rect x="1.2" y="6" width="13" height="9" rx="1.6"/><path d="M19 7.5c2.6 2.6 2.6 6.4 0 9"/><path d="M23 4.5c4.3 4.3 4.3 11.7 0 15"/>
+        </svg>
+      </div>
+    </div>
+    <div class="splash-start">
+      <div class="s1">Appuyez pour commencer</div>
+      <div class="s2">Touchez pour débuter</div>
+    </div>
+  </div>
+
   <!-- ECRAN 1 : Type de commande -->
-  <div class="screen" id="screen-type">
+  <div class="screen hidden" id="screen-type">
     <svg class="deco deco-tr" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path d="M300,0 V210 C250,205 240,120 175,140 C120,157 95,95 140,60 C180,30 175,0 175,0 Z" fill="#0637c8"/>
       <path d="M300,0 V150 C255,150 250,85 190,95 C140,103 150,30 200,25 C245,20 240,0 240,0 Z" fill="#1e5fd6" opacity="0.55"/>
@@ -479,8 +556,7 @@
 
   <!-- ECRAN 2 : Produit (borne : categories a gauche, produits a droite) -->
   <div class="screen hidden" id="screen-product">
-    <div class="step-title">Choisissez un produit</div>
-    <div class="step-sub" id="product-sub"></div>
+    <div class="step-title">BURGER GRILL 76</div>
     <div class="kiosk">
       <div class="kiosk-cats" id="kiosk-cats"></div>
       <div class="kiosk-products"><div class="kiosk-grid" id="kiosk-grid"></div></div>
@@ -1314,6 +1390,10 @@ function updateCart(){
   document.getElementById('cartInfo').textContent = t;
 }
 
+// ===================== ECRAN D'ACCUEIL =====================
+// Toute la surface est tactile : un appui lance la prise de commande.
+document.getElementById('screen-splash').addEventListener('click', () => showScreen('screen-type'));
+
 // ===================== ECRAN TYPE =====================
 document.querySelectorAll('#opts-type .opt').forEach(opt => {
   opt.addEventListener('click', () => {
@@ -1374,7 +1454,6 @@ function selectCategory(i){
   activeCatIndex = i;
   const cat = MENU[i];
   [...document.getElementById('kiosk-cats').children].forEach((el, k) => el.classList.toggle('active', k === i));
-  document.getElementById('product-sub').textContent = cat.title;
   const grid = document.getElementById('kiosk-grid');
   renderProductGrid(cat, grid);
   document.querySelector('.kiosk-products').scrollTop = 0;
